@@ -1,0 +1,17 @@
+{
+  "regions": ["lhr1"],
+  "crons": [
+    {
+      "path": "/api/notify/shift-reminders",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/notify/gap-alerts",
+      "schedule": "0 9 * * 1"
+    },
+    {
+      "path": "/api/admin/retention-cleanup",
+      "schedule": "0 2 1 * *"
+    }
+  ]
+}
