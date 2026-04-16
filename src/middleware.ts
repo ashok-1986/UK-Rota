@@ -26,6 +26,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/privacy',
   '/api/webhooks/clerk',
+  '/api/setup/first-home(.*)',
 ]);
 
 const isCronRoute = createRouteMatcher([
