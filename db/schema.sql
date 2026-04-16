@@ -173,8 +173,21 @@ CREATE INDEX idx_logs_home_action ON logs(home_id, action);
 CREATE INDEX idx_logs_actor ON logs(actor_id);
 CREATE INDEX idx_logs_created_at ON logs(created_at);
 
+-- Staff Availability
+CREATE INDEX idx_staff_availability_staff_date ON staff_availability(staff_id, date);
+
 -- =============================================================
--- SEED DATA: Default shifts for new homes
+-- STAFF AVAILABILITY (Staff unavailable dates)
+-- Used for scheduling conflicts
+-- =============================================================
+CREATE TABLE staff_availability (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id    UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  date        DATE NOT NULL,
+  reason      VARCHAR(100) DEFAULT 'unavailable',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(staff_id, date)
+);
 -- =============================================================
 -- Note: Inserted by application logic when a new home is created
 -- Default shift templates:
