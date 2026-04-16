@@ -84,8 +84,9 @@ export interface Shift {
   end_time: string;
   duration_hours: number;
   color: string;
+  is_night: boolean;
+  is_weekend: boolean;
   is_active: boolean;
-  is_night?: boolean; // For rules engine compatibility
   created_at: string;
   updated_at: string;
 }

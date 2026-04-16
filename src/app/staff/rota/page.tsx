@@ -92,6 +92,8 @@ export default async function StaffRotaPage() {
       end_time: r.s_end_time as string,
       duration_hours: Number(r.s_duration_hours),
       color: r.s_color as string,
+      is_night: false,
+      is_weekend: false,
       is_active: true,
       created_at: '',
       updated_at: '',

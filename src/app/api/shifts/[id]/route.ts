@@ -12,6 +12,8 @@ const UpdateSchema = z.object({
   startTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/).optional(),
   endTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/).optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  isNight: z.boolean().optional(),
+  isWeekend: z.boolean().optional(),
   isActive: z.boolean().optional(),
 })
 
@@ -36,7 +38,7 @@ export async function GET(
 
   const [shift] = await sql`
     SELECT id, home_id, name, start_time::text AS start_time, end_time::text AS end_time,
-           duration_hours, color, is_active, created_at, updated_at
+           duration_hours, color, is_night, is_weekend, is_active, created_at, updated_at
     FROM shifts
     WHERE id = ${id} AND home_id = ${homeId}
     LIMIT 1
@@ -81,6 +83,8 @@ export async function PUT(
   const startTime = d.startTime ?? null
   const endTime = d.endTime ?? null
   const color = d.color ?? null
+  const isNight = d.isNight ?? null
+  const isWeekend = d.isWeekend ?? null
   const isActive = d.isActive ?? null
 
   // Calculate duration if times are being updated
@@ -98,6 +102,8 @@ export async function PUT(
       end_time = COALESCE(${endTime}, end_time),
       duration_hours = COALESCE(${duration}, duration_hours),
       color = COALESCE(${color}, color),
+      is_night = COALESCE(${isNight}, is_night),
+      is_weekend = COALESCE(${isWeekend}, is_weekend),
       is_active = COALESCE(${isActive}, is_active),
       updated_at = NOW()
     WHERE id = ${id} AND home_id = ${headerHomeId}

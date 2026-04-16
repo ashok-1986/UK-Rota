@@ -18,6 +18,8 @@ export function ShiftForm({ homeId }: ShiftFormProps) {
   const [startTime, setStartTime] = useState('07:00')
   const [endTime, setEndTime] = useState('15:00')
   const [color, setColor] = useState(defaultColors[0])
+  const [isNight, setIsNight] = useState(false)
+  const [isWeekend, setIsWeekend] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,7 +30,7 @@ export function ShiftForm({ homeId }: ShiftFormProps) {
       const res = await fetch('/api/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ homeId, name, startTime, endTime, color }),
+        body: JSON.stringify({ homeId, name, startTime, endTime, color, isNight, isWeekend }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to create shift')
@@ -94,6 +96,27 @@ export function ShiftForm({ homeId }: ShiftFormProps) {
             onChange={e => setEndTime(e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isNight}
+            onChange={e => setIsNight(e.target.checked)}
+            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-700">Night shift</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isWeekend}
+            onChange={e => setIsWeekend(e.target.checked)}
+            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+          />
+          <span className="text-sm text-gray-700">Weekend shift</span>
+        </label>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

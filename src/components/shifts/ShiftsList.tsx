@@ -51,7 +51,15 @@ function ShiftCard({ shift }: { shift: Shift }) {
           style={{ backgroundColor: shift.color }}
         />
         <div>
-          <p className="font-semibold text-gray-900">{shift.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-gray-900">{shift.name}</p>
+            {shift.is_night && (
+              <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">Night</span>
+            )}
+            {shift.is_weekend && (
+              <span className="text-xs px-2 py-0.5 rounded bg-orange-100 text-orange-700">Weekend</span>
+            )}
+          </div>
           <p className="text-sm text-gray-500">
             {startTime} – {endTime} ({shift.duration_hours}h)
           </p>

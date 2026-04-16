@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         id: row.shift_id, home_id: row.home_id, name: row.shift_name,
         start_time: row.shift_start_time, end_time: row.shift_end_time,
         duration_hours: Number(row.duration_hours), color: row.shift_color,
-        is_active: true, created_at: '', updated_at: '',
+        is_night: false, is_weekend: false, is_active: true, created_at: '', updated_at: '',
       },
       staff,
     }

@@ -13,6 +13,8 @@ const CreateSchema = z.object({
   startTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'HH:mm format'),
   endTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'HH:mm format'),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  isNight: z.boolean().optional(),
+  isWeekend: z.boolean().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const shifts = await sql`
     SELECT id, home_id, name, start_time::text AS start_time, end_time::text AS end_time,
-           duration_hours, color, is_active, created_at, updated_at
+           duration_hours, color, is_night, is_weekend, is_active, created_at, updated_at
     FROM shifts
     WHERE home_id = ${homeId} AND is_active = TRUE
     ORDER BY start_time
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Validation error', issues: parsed.error.flatten() }, { status: 400 })
   }
 
-  const { homeId, name, startTime, endTime, color } = parsed.data
+  const { homeId, name, startTime, endTime, color, isNight, isWeekend } = parsed.data
 
   if (role !== 'system_admin' && homeId !== headerHomeId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -63,8 +65,8 @@ export async function POST(req: NextRequest) {
   if (duration <= 0) duration += 24 // overnight shift
 
   const [shift] = await sql`
-    INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color)
-    VALUES (${homeId}, ${name}, ${startTime}, ${endTime}, ${duration}, ${color ?? '#3B82F6'})
+    INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color, is_night, is_weekend)
+    VALUES (${homeId}, ${name}, ${startTime}, ${endTime}, ${duration}, ${color ?? '#3B82F6'}, ${isNight ?? false}, ${isWeekend ?? false})
     RETURNING *
   `
 

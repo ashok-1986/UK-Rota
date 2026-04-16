@@ -76,8 +76,10 @@ CREATE TABLE shifts (
   start_time      TIME NOT NULL,
   end_time        TIME NOT NULL,
   duration_hours  NUMERIC(4,1) NOT NULL,
-  color           VARCHAR(7) NOT NULL DEFAULT '#3B82F6',  -- Hex color for UI
-  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  color           VARCHAR(7) NOT NULL DEFAULT '#3B82F6',
+  is_night        BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_weekend      BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
