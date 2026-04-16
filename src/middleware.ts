@@ -76,12 +76,28 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   const { sessionClaims } = await auth();
 
   // Load tenant ID and role from metadata (in a real app, this comes from the custom JWT template)
+  // Also support organization-based access via Clerk Organizations
   const metadata = (sessionClaims as any)?.metadata as { role?: AppRole; homeId?: string } | undefined;
   
-  // Fallback: if role is missing, default to care_staff (will be restricted to their own view)
-  // If homeId is missing, user won't have access to tenant-scoped routes until assigned to a home
-  const role = metadata?.role ?? null;
-  const homeId = metadata?.homeId ?? null;
+  // Support both metadata-based and organization-based access
+  // Clerk Organizations: org_id and org_role from JWT
+  const orgId = (sessionClaims as any)?.org_id ?? null;
+  const orgRole = (sessionClaims as any)?.org_role ?? null;
+  
+  // Use org_id as homeId if available, otherwise fall back to metadata
+  let role = metadata?.role ?? null;
+  let homeId = metadata?.homeId ?? orgId ?? null;
+  
+  // If user has organization role, map it to our roles
+  if (orgRole && !role) {
+    if (orgRole === 'admin') {
+      role = 'home_manager';
+    } else if (orgRole === 'member') {
+      role = 'care_staff';
+    } else if (orgRole === 'guest') {
+      role = 'bank_staff';
+    }
+  }
 
   // 4. Admin-only guard
   if (isAdminRoute(request) && role !== 'system_admin') {
