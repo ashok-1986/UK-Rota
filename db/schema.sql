@@ -177,6 +177,30 @@ CREATE INDEX idx_logs_created_at ON logs(created_at);
 CREATE INDEX idx_staff_availability_staff_date ON staff_availability(staff_id, date);
 
 -- =============================================================
+-- SHIFT SWAPS (Staff shift exchange requests)
+-- Allows staff to request swapping shifts with each other
+-- =============================================================
+CREATE TABLE shift_swaps (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id      UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  target_id         UUID REFERENCES staff(id) ON DELETE SET NULL,
+  requester_shift_id UUID NOT NULL REFERENCES rota_shifts(id) ON DELETE CASCADE,
+  target_shift_id  UUID REFERENCES rota_shifts(id) ON DELETE SET NULL,
+  status            VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  reason            TEXT,
+  response_note     TEXT,
+  reviewed_by       UUID REFERENCES staff(id),
+  reviewed_at       TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_shift_swaps_requester ON shift_swaps(requester_id);
+CREATE INDEX idx_shift_swaps_target ON shift_swaps(target_id);
+CREATE INDEX idx_shift_swaps_status ON shift_swaps(status);
+
+-- =============================================================
 -- STAFF AVAILABILITY (Staff unavailable dates)
 -- Used for scheduling conflicts
 -- =============================================================
@@ -190,7 +214,7 @@ CREATE TABLE staff_availability (
 );
 -- =============================================================
 -- Note: Inserted by application logic when a new home is created
--- Default shift templates:
+-- Default shift templates (already exist in schema):
 --   Early:  07:00 - 15:00 (8h)
 --   Late:   14:00 - 22:00 (8h)
 --   Night:  22:00 - 07:00 (9h)

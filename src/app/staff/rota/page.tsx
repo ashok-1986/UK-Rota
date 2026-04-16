@@ -108,6 +108,7 @@ export default async function StaffRotaPage() {
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/staff/rota" className="text-lg font-bold text-blue-900">CareRota</Link>
           <div className="flex items-center gap-3">
+            <Link href="/swaps" className="text-xs text-gray-400 hover:text-gray-600">Swaps</Link>
             <a href="/privacy" className="text-xs text-gray-400 hover:text-gray-600">Privacy</a>
             <UserButton />
           </div>

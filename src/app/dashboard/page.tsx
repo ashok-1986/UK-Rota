@@ -81,6 +81,9 @@ export default async function DashboardPage() {
               <Link href={`/homes/${homeId}/settings/home`} className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900">
                 Settings
               </Link>
+              <Link href="/swaps" className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900">
+                Swaps
+              </Link>
             </nav>
           </div>
           <UserButton />
