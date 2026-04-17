@@ -1,6 +1,5 @@
 import { auth, clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import type { AppRole } from '@/types'
 import LandingPage from '@/components/landing/LandingPage'
 import sql from '@/lib/db'
@@ -46,11 +45,18 @@ export default async function RootPage() {
     return <LandingPage />
   }
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
+  // Read from custom JWT template (sessionClaims.metadata) with fallback to
+  // Clerk's default location (sessionClaims.publicMetadata) for when the
+  // custom template is not configured in the Clerk Dashboard.
+  const customMeta = (sessionClaims as Record<string, unknown>)?.metadata as
+    | { role?: AppRole; homeId?: string }
+    | undefined
+  const pubMeta = (sessionClaims as Record<string, unknown>)?.publicMetadata as
+    | { role?: AppRole; homeId?: string }
+    | undefined
 
-  let homeId = metadata?.homeId
-  let role = metadata?.role
+  let homeId = customMeta?.homeId ?? pubMeta?.homeId
+  let role = customMeta?.role ?? pubMeta?.role
 
   // Build Monday of this week
   const now = new Date()
@@ -59,22 +65,19 @@ export default async function RootPage() {
   now.setDate(now.getDate() + diff)
   const thisWeek = now.toISOString().slice(0, 10)
 
-  // Check if user has role and homeId set up
   if (!homeId || !role) {
-    // Try to self-heal: look up the staff record and sync Clerk metadata
+    // Try to self-heal: find the staff record in the DB and sync Clerk metadata.
+    // After repair, redirect to /account-not-linked?linked=1 so the user can
+    // sign out → sign in to get a fresh JWT with the new metadata.
     const repaired = await tryRepairMetadata(userId)
     if (repaired) {
-      homeId = repaired.homeId
-      role = repaired.role
-      // Metadata is now fixed in Clerk — redirect so the new session token is issued
-      redirect('/')
+      redirect('/account-not-linked?linked=1')
     }
 
-    // Check if any home exists in the system
+    // No staff record found — check if the whole system needs first-time setup
     const needsSetup = await checkNeedsSetup()
 
     if (needsSetup) {
-      // First time setup - show option to create home
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm text-center">
@@ -99,26 +102,12 @@ export default async function RootPage() {
       )
     }
 
-    // Home exists but user not linked
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Account Not Linked</h1>
-          <p className="text-gray-600 mb-6">
-            Your account is not linked to a care home. Please contact your administrator.
-          </p>
-          <Link href="/sign-in" className="text-blue-600 hover:underline">
-            Sign out and try another account
-          </Link>
-        </div>
-      </div>
-    )
+    redirect('/account-not-linked')
   }
 
   if (role === 'home_manager' || role === 'system_admin') {
     redirect(`/dashboard/rota/${homeId}/${thisWeek}`)
   }
 
-  // Staff land on their shift view
   redirect('/staff/rota')
 }

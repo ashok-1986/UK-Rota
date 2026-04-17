@@ -12,6 +12,8 @@
 //     "homeId": "{{user.public_metadata.homeId}}"
 //   }
 // }
+// If the template is NOT configured, publicMetadata is read directly
+// from sessionClaims.publicMetadata (Clerk default).
 // =============================================================
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
@@ -22,8 +24,10 @@ import type { AppRole } from '@/types';
 // Route matchers
 // ------------------------------------------------------------------
 const isPublicRoute = createRouteMatcher([
+  '/',                          // landing page — unauthenticated users must see this
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/account-not-linked(.*)',    // needs to be reachable without valid metadata
   '/privacy',
   '/api/webhooks/clerk',
   '/api/setup/first-home(.*)',
@@ -56,12 +60,12 @@ const isAdminRoute = createRouteMatcher([
 // Middleware
 // ------------------------------------------------------------------
 export default clerkMiddleware(async (auth, request: NextRequest) => {
-  // 1. Public routes
+  // 1. Public routes — no auth required
   if (isPublicRoute(request)) {
     return NextResponse.next();
   }
 
-  // 2. Cron routes
+  // 2. Cron routes — secret header only
   if (isCronRoute(request)) {
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
@@ -75,28 +79,28 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   await auth.protect();
   const { sessionClaims } = await auth();
 
-  // Load tenant ID and role from metadata (in a real app, this comes from the custom JWT template)
-  // Also support organization-based access via Clerk Organizations
-  const metadata = (sessionClaims as any)?.metadata as { role?: AppRole; homeId?: string } | undefined;
-  
-  // Support both metadata-based and organization-based access
-  // Clerk Organizations: org_id and org_role from JWT
-  const orgId = (sessionClaims as any)?.org_id ?? null;
-  const orgRole = (sessionClaims as any)?.org_role ?? null;
-  
-  // Use org_id as homeId if available, otherwise fall back to metadata
-  let role = metadata?.role ?? null;
-  let homeId = metadata?.homeId ?? orgId ?? null;
-  
-  // If user has organization role, map it to our roles
+  // Read role + homeId from JWT.
+  // Primary:  sessionClaims.metadata  (set by custom JWT template in Clerk Dashboard)
+  // Fallback: sessionClaims.publicMetadata (Clerk default — present when no custom template)
+  const customMeta = (sessionClaims as Record<string, unknown>)?.metadata as
+    | { role?: AppRole; homeId?: string }
+    | undefined;
+  const pubMeta = (sessionClaims as Record<string, unknown>)?.publicMetadata as
+    | { role?: AppRole; homeId?: string }
+    | undefined;
+
+  // Support Clerk Organizations as a secondary fallback
+  const orgId = (sessionClaims as Record<string, unknown>)?.org_id as string | null ?? null;
+  const orgRole = (sessionClaims as Record<string, unknown>)?.org_role as string | null ?? null;
+
+  let role: AppRole | null = customMeta?.role ?? pubMeta?.role ?? null;
+  let homeId: string | null = customMeta?.homeId ?? pubMeta?.homeId ?? orgId ?? null;
+
+  // Map Clerk org role → app role when no explicit role is set
   if (orgRole && !role) {
-    if (orgRole === 'admin') {
-      role = 'home_manager';
-    } else if (orgRole === 'member') {
-      role = 'care_staff';
-    } else if (orgRole === 'guest') {
-      role = 'bank_staff';
-    }
+    if (orgRole === 'admin') role = 'home_manager';
+    else if (orgRole === 'member') role = 'care_staff';
+    else if (orgRole === 'guest') role = 'bank_staff';
   }
 
   // 4. Admin-only guard
@@ -110,7 +114,6 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   }
 
   // 6. Tenant isolation validation
-  // If the URL contains a homeId, check if it matches the user's tenant
   const urlPath = request.nextUrl.pathname;
   const homeIdMatch = urlPath.match(/^\/homes\/([^/]+)/);
   if (homeIdMatch && homeIdMatch[1] !== homeId && role !== 'system_admin') {
