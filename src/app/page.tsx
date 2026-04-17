@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import type { AppRole } from '@/types'
+import LandingPage from '@/components/landing/LandingPage'
 
 async function checkNeedsSetup(): Promise<boolean> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -21,7 +22,7 @@ export default async function RootPage() {
   const { userId, sessionClaims } = await auth()
 
   if (!userId) {
-    redirect('/sign-in')
+    return <LandingPage />
   }
 
   const metadata = (sessionClaims as Record<string, unknown> | null)
