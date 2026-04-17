@@ -105,7 +105,11 @@ export default async function RootPage() {
     redirect('/account-not-linked')
   }
 
-  if (role === 'home_manager' || role === 'system_admin') {
+  if (role === 'system_admin') {
+    redirect('/dashboard')
+  }
+
+  if (role === 'home_manager') {
     redirect(`/dashboard/rota/${homeId}/${thisWeek}`)
   }
 

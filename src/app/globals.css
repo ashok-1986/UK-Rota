@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --font-serif: 'Melodrama', Georgia, serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
   --font-sans:  'Supreme', system-ui, sans-serif;
 }
 
