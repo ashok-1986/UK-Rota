@@ -109,9 +109,6 @@ CREATE INDEX idx_rota_shifts_home_week ON rota_shifts(home_id, week_start);
 CREATE INDEX idx_rota_shifts_staff_date ON rota_shifts(staff_id, shift_date);
 CREATE INDEX idx_logs_home_action ON logs(home_id, action);
 
--- SEED DATA (Default shifts)
-INSERT INTO shifts (id, home_id, name, start_time, end_time, duration_hours, color)
-VALUES 
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'Early', '07:00:00', '15:00:00', 8, '#3B82F6'),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'Late', '14:00:00', '22:00:00', 8, '#8B5CF6'),
-  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'Night', '22:00:00', '07:00:00', 9, '#6366F1');
+-- Default shifts and rules are seeded per-home via POST /api/auth/signup-home
+-- or POST /api/setup/first-home after a home record is created.
+-- Do NOT seed shifts here — shifts.home_id is NOT NULL and requires a real home FK.

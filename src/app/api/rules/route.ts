@@ -1,9 +1,10 @@
-// GET  /api/rules?homeId=  — fetch rules for a home
-// POST /api/rules           — create a rule
+// GET  /api/rules?homeId=  — fetch rules for a home (returns HomeRules object)
+// POST /api/rules           — upsert a single rule
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import sql from '@/lib/db'
+import { parseRules } from '@/lib/rules'
 import { writeAuditLog, getIp } from '@/lib/audit'
 
 const CreateSchema = z.object({
@@ -26,10 +27,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const rules = await sql`
-    SELECT * FROM rules WHERE home_id = ${homeId} ORDER BY rule_type
-  `
-  return NextResponse.json(rules)
+  const rows = await sql`
+    SELECT rule_type, value FROM rules
+    WHERE home_id = ${homeId} AND is_active = TRUE
+    ORDER BY rule_type
+  ` as { rule_type: string; value: number }[]
+
+  return NextResponse.json(parseRules(rows))
 }
 
 export async function POST(req: NextRequest) {

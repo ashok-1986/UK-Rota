@@ -108,14 +108,22 @@ export interface RotaShift {
   updated_at: string;
 }
 
+export type RuleType = 'min_rest_hours' | 'max_weekly_hours' | 'max_consecutive_days';
+
 export interface Rule {
   id: string;
   home_id: string;
-  rule_type: string;
+  rule_type: RuleType;
   value: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface HomeRules {
+  minRestHours: number;       // rule_type: 'min_rest_hours'  (default 11)
+  maxWeeklyHours: number;     // rule_type: 'max_weekly_hours' (default 48)
+  maxConsecutiveDays: number; // rule_type: 'max_consecutive_days' (default 6)
 }
 
 export interface Log {

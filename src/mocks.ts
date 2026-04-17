@@ -40,24 +40,23 @@ export type MockRotaShift = {
   home_id: string;
   unit_id: string;
   date: string;        // "2026-04-14"
-  status: "scheduling" | "confirmed" | "sick" | "cancelled";
+  status: "draft" | "published" | "confirmed" | "cancelled";
 };
 
 export type MockRule = {
   home_id: string;
-  min_hours_between_shifts: number;
-  max_hours_week: number;
-  max_night_shifts_week: number;
-  rest_break_hours: number;
+  min_rest_hours: number;
+  max_weekly_hours: number;
+  max_consecutive_days: number;
 };
 
 export type MockLog = {
   id: string;
-  user_id: string;
+  actor_id: string;
   action: string;
   entity_type: string;
   entity_id: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   ip_address: string | null;
   user_agent: string | null;
 };
@@ -175,9 +174,7 @@ export const generateMockRota: () => MockRotaShift[] = () => {
         home_id: "home-001",
         unit_id: "unit-001",
         date: dateString,
-        status: staffId
-          ? "scheduling"
-          : "scheduling", // no “gap” state in mock UI; gap will be inferred by UI
+        status: "draft",
       });
     }
   }
@@ -188,17 +185,16 @@ export const generateMockRota: () => MockRotaShift[] = () => {
 export const mockRules: MockRule[] = [
   {
     home_id: "home-001",
-    min_hours_between_shifts: 11,
-    max_hours_week: 48,
-    max_night_shifts_week: 3,
-    rest_break_hours: 11,
+    min_rest_hours: 11,
+    max_weekly_hours: 48,
+    max_consecutive_days: 6,
   },
 ];
 
 export const mockLogs: MockLog[] = [
   {
     id: "log-001",
-    user_id: "staff-001",
+    actor_id: "staff-001",
     action: "rota.assign",
     entity_type: "rota_shift",
     entity_id: "2026-04-14-shift-001",
