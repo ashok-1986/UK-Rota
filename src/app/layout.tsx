@@ -1,22 +1,6 @@
 import type { Metadata } from 'next'
 import { ClerkProvider } from '@clerk/nextjs'
-import { Fraunces, DM_Sans } from 'next/font/google'
 import './globals.css'
-
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  variable: '--font-serif',
-  weight: ['400', '600', '700'],
-  style: ['normal', 'italic'],
-  display: 'swap',
-})
-
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  weight: ['400', '500', '600'],
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'CareRota — Staff Scheduling for Care Homes',
@@ -30,7 +14,14 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="en-GB" className={`${fraunces.variable} ${dmSans.variable}`}>
+      <html lang="en-GB">
+        <head>
+          <link rel="preconnect" href="https://api.fontshare.com" />
+          <link
+            href="https://api.fontshare.com/v2/css?f[]=melodrama@700,600,400&f[]=supreme@400,500,600&display=swap"
+            rel="stylesheet"
+          />
+        </head>
         <body>{children}</body>
       </html>
     </ClerkProvider>

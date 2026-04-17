@@ -22,7 +22,7 @@
   --lgrey:   #E5E7EB;
   --text:    #111827;
 
-  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Supreme', system-ui, sans-serif);
   color: var(--text);
   background: var(--offwhite);
   line-height: 1.6;
@@ -42,7 +42,7 @@
 }
 
 .navLogo {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--navy);
@@ -76,7 +76,7 @@
   padding: 10px 22px;
   font-size: 0.9rem;
   font-weight: 600;
-  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Supreme', system-ui, sans-serif);
   cursor: pointer;
   transition: background 0.2s, transform 0.15s;
   text-decoration: none;
@@ -130,7 +130,7 @@
 }
 
 .h1 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: clamp(2.4rem, 4vw, 3.6rem);
   font-weight: 700;
   line-height: 1.1;
@@ -164,7 +164,7 @@
   padding: 16px 32px;
   font-size: 1rem;
   font-weight: 600;
-  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Supreme', system-ui, sans-serif);
   cursor: pointer;
   transition: all 0.2s;
   text-decoration: none;
@@ -345,7 +345,7 @@
 }
 
 .h2 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: clamp(1.8rem, 3vw, 2.8rem);
   font-weight: 700;
   color: var(--navy);
@@ -378,7 +378,7 @@
 .stat { text-align: center; }
 
 .statNum {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 3rem;
   font-weight: 700;
   color: #fff;
@@ -439,7 +439,7 @@
 }
 
 .featureCard h3 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1.15rem;
   font-weight: 600;
   color: var(--navy);
@@ -497,7 +497,7 @@
   background: var(--navy);
   color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1.4rem;
   font-weight: 700;
   margin: 0 auto 20px;
@@ -506,7 +506,7 @@
 }
 
 .hiwStep h3 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1rem;
   font-weight: 600;
   color: var(--navy);
@@ -606,7 +606,7 @@
 .stars { color: #F59E0B; font-size: 0.9rem; margin-bottom: 16px; letter-spacing: 2px; }
 
 .testimonialCard blockquote {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1rem;
   font-style: italic;
   color: var(--navy);
@@ -674,14 +674,14 @@
 }
 
 .pricingCard h3 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1.2rem;
   color: var(--navy);
   margin-bottom: 8px;
 }
 
 .price {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 3rem;
   font-weight: 700;
   color: var(--navy);
@@ -715,7 +715,7 @@
   color: var(--navy);
   font-weight: 600;
   font-size: 0.92rem;
-  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Supreme', system-ui, sans-serif);
   cursor: pointer;
   background: none;
   transition: all 0.2s;
@@ -735,7 +735,7 @@
   color: #fff;
   font-weight: 600;
   font-size: 0.92rem;
-  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-family: var(--font-sans, 'Supreme', system-ui, sans-serif);
   cursor: pointer;
   background: var(--blue);
   transition: all 0.2s;
@@ -785,7 +785,7 @@
 }
 
 .footerBrand h4 {
-  font-family: var(--font-serif, 'Fraunces', Georgia, serif);
+  font-family: var(--font-serif, 'Melodrama', Georgia, serif);
   font-size: 1.4rem;
   color: #fff;
   margin-bottom: 12px;
