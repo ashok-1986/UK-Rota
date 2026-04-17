@@ -83,6 +83,7 @@ export async function GET(req: NextRequest) {
         id: row.shift_id, home_id: homeId, name: row.shift_name,
         start_time: row.shift_start_time, end_time: row.shift_end_time,
         duration_hours: duration, color: row.shift_color,
+        is_night: row.is_night ?? false, is_weekend: row.is_weekend ?? false,
         is_active: true, created_at: '', updated_at: '',
       },
       staff: entry.staff,

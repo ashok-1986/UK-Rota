@@ -68,6 +68,8 @@ export async function GET(req: NextRequest) {
           end_time: shift.end_time as string,
           duration_hours: Number(shift.duration_hours),
           color: shift.color as string,
+          is_night: shift.is_night as boolean,
+          is_weekend: shift.is_weekend as boolean,
           is_active: true,
           created_at: '',
           updated_at: '',

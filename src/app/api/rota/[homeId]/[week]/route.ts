@@ -79,6 +79,8 @@ export async function GET(
           end_time: shift.end_time as string,
           duration_hours: Number(shift.duration_hours),
           color: shift.color as string,
+          is_night: shift.is_night as boolean,
+          is_weekend: shift.is_weekend as boolean,
           is_active: shift.is_active as boolean,
           created_at: shift.created_at as string,
           updated_at: shift.updated_at as string,

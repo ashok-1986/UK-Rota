@@ -23,7 +23,7 @@ export async function writeAuditLog(params: AuditParams): Promise<void> {
   try {
     await sql`
       INSERT INTO logs
-        (home_id, actor_id, action, entity_type, entity_id, metadata, ip_address)
+        (home_id, actor_id, action, entity_type, entity_id, metadata_json, ip_address)
       VALUES (
         ${params.homeId ?? null},
         ${params.actorId ?? null},

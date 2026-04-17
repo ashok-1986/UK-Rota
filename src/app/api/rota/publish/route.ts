@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Validation error', issues: parsed.error.flatten() }, { status: 400 })
   }
   const { homeId, weekStart } = parsed.data
+  // Read override from the already-parsed body (req.json() can only be called once)
+  const override = body.override === true
 
   try {
     validateWeekStart(weekStart)
@@ -75,8 +77,7 @@ export async function POST(req: NextRequest) {
   }
 
   // If there are violations, return them for the user to review
-  // but allow override if explicitly requested
-  const override = (await req.json()).override === true
+  // but allow override if explicitly requested (parsed from body above)
   if (ruleViolations.length > 0 && !override) {
     return NextResponse.json({
       error: 'Rules validation failed',
