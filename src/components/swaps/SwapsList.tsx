@@ -26,6 +26,7 @@ export function SwapsList({ role }: { role: AppRole }) {
   const router = useRouter()
   const [swaps, setSwaps] = useState<SwapRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [filter, setFilter] = useState('pending')
   const [processing, setProcessing] = useState<string | null>(null)
 
@@ -37,14 +38,21 @@ export function SwapsList({ role }: { role: AppRole }) {
 
   async function loadSwaps() {
     setLoading(true)
+    setFetchError(null)
     try {
       const res = await fetch(`/api/shifts/swaps?status=${filter}`)
-      if (res.ok) {
-        const data = await res.json()
-        setSwaps(data)
+      if (!res.ok) {
+        setSwaps([])
+        setFetchError('Unable to load swap requests. Please try again.')
+        return
       }
+
+      const data = await res.json()
+      setSwaps(data)
     } catch (err) {
       console.error('Failed to load swaps:', err)
+      setSwaps([])
+      setFetchError('Unable to load swap requests. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -103,6 +111,12 @@ export function SwapsList({ role }: { role: AppRole }) {
           </div>
         )}
 
+        {fetchError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {fetchError}
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center py-12 text-gray-500">Loading...</div>
         ) : swaps.length === 0 ? (
@@ -141,9 +155,15 @@ export function SwapsList({ role }: { role: AppRole }) {
                         <p className="text-sm text-gray-600">
                           ↔ {swap.target_first_name} {swap.target_last_name}
                         </p>
-                        <p className="text-sm text-gray-600">
-                          {swap.target_shift_name} on {formatDate(swap.target_shift_date!)}
-                        </p>
+                        {swap.target_shift_date ? (
+                          <p className="text-sm text-gray-600">
+                            {swap.target_shift_name} on {formatDate(swap.target_shift_date)}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-gray-600">
+                            {swap.target_shift_name ?? 'Target shift'} date unavailable
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -171,6 +191,7 @@ export function SwapsList({ role }: { role: AppRole }) {
                       <Button
                         size="sm"
                         variant="secondary"
+                        loading={processing === swap.id}
                         onClick={() => {
                           const note = prompt('Reason for rejection (optional):')
                           handleResponse(swap.id, 'rejected', note ?? undefined)

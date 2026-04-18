@@ -73,7 +73,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const [swap] = await sql`
-      SELECT id, requester_id, staff_id as target_id, requester_shift_id, target_shift_id, status
+      SELECT id, requester_id, target_id, requester_shift_id, target_shift_id, status
       FROM shift_swaps ss
       JOIN staff s ON s.id = ss.requester_id
       WHERE ss.id = ${id} AND s.home_id = ${homeId}
