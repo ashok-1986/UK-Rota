@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       s.duration_hours, s.color AS shift_color
     FROM rota_shifts rs
     JOIN staff st ON st.id = rs.staff_id
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = rs.home_id
     WHERE rs.shift_date = ${tomorrowStr}
       AND rs.status = 'published'
       AND rs.staff_id IS NOT NULL

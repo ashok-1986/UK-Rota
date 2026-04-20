@@ -52,7 +52,7 @@ export async function GET(
       st.phone           AS staff_phone,
       st.role            AS staff_role
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
     LEFT JOIN staff st ON st.id = rs.staff_id
     WHERE rs.home_id = ${homeId}
       AND rs.week_start = ${week}

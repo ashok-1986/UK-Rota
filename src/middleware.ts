@@ -83,10 +83,10 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   // Primary:  sessionClaims.metadata  (set by custom JWT template in Clerk Dashboard)
   // Fallback: sessionClaims.publicMetadata (Clerk default — present when no custom template)
   const customMeta = (sessionClaims as Record<string, unknown>)?.metadata as
-    | { role?: AppRole; homeId?: string }
+    | { role?: AppRole; homeId?: string; home_id?: string }
     | undefined;
   const pubMeta = (sessionClaims as Record<string, unknown>)?.publicMetadata as
-    | { role?: AppRole; homeId?: string }
+    | { role?: AppRole; homeId?: string; home_id?: string }
     | undefined;
 
   // Support Clerk Organizations as a secondary fallback
@@ -94,7 +94,8 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   const orgRole = (sessionClaims as Record<string, unknown>)?.org_role as string | null ?? null;
 
   let role: AppRole | null = customMeta?.role ?? pubMeta?.role ?? null;
-  let homeId: string | null = customMeta?.homeId ?? pubMeta?.homeId ?? orgId ?? null;
+  let homeId: string | null =
+    customMeta?.home_id ?? customMeta?.homeId ?? pubMeta?.home_id ?? pubMeta?.homeId ?? orgId ?? null;
 
   // Map Clerk org role → app role when no explicit role is set
   if (orgRole && !role) {

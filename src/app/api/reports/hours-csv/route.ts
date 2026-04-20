@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       s.start_time::text AS shift_start_time, s.end_time::text AS shift_end_time,
       s.duration_hours, s.color AS shift_color
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
     JOIN staff st ON st.id = rs.staff_id
     WHERE rs.home_id = ${homeId}
       AND rs.week_start = ${week}

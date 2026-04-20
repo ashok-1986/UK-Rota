@@ -3,17 +3,12 @@
 // Aligned with PostgreSQL schema and API contracts
 // =============================================================
 
-// ------------------------------------------------------------------
-// Roles and status enums
-// ------------------------------------------------------------------
-
 export type AppRole = 'system_admin' | 'home_manager' | 'unit_manager' | 'care_staff' | 'bank_staff';
+export type UserRole = AppRole;
 export type EmploymentType = 'full_time' | 'part_time' | 'bank';
 export type RotaStatus = 'draft' | 'published' | 'confirmed' | 'cancelled';
-
-// ------------------------------------------------------------------
-// Core entity types (aligned with PostgreSQL schema)
-// ------------------------------------------------------------------
+export type RotaShiftStatus = RotaStatus;
+export type RuleType = 'min_rest_hours' | 'max_weekly_hours' | 'max_consecutive_days';
 
 export interface Home {
   id: string;
@@ -25,7 +20,6 @@ export interface Home {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  // Clerk integration
   clerk_org_id?: string | null;
 }
 
@@ -80,7 +74,7 @@ export interface Shift {
   id: string;
   home_id: string;
   name: string;
-  start_time: string; // TIME format HH:mm:ss
+  start_time: string;
   end_time: string;
   duration_hours: number;
   color: string;
@@ -97,9 +91,9 @@ export interface RotaShift {
   shift_id: string;
   staff_id: string | null;
   unit_id: string | null;
-  shift_date: string; // DATE format YYYY-MM-DD
-  date?: string; // Alias for shift_date (for rules engine compatibility)
-  week_start: string; // YYYY-MM-DD (Monday)
+  shift_date: string;
+  date?: string;
+  week_start: string;
   status: RotaStatus;
   notes: string | null;
   confirmed_at: string | null;
@@ -107,8 +101,6 @@ export interface RotaShift {
   created_at: string;
   updated_at: string;
 }
-
-export type RuleType = 'min_rest_hours' | 'max_weekly_hours' | 'max_consecutive_days';
 
 export interface Rule {
   id: string;
@@ -121,9 +113,9 @@ export interface Rule {
 }
 
 export interface HomeRules {
-  minRestHours: number;       // rule_type: 'min_rest_hours'  (default 11)
-  maxWeeklyHours: number;     // rule_type: 'max_weekly_hours' (default 48)
-  maxConsecutiveDays: number; // rule_type: 'max_consecutive_days' (default 6)
+  minRestHours: number;
+  maxWeeklyHours: number;
+  maxConsecutiveDays: number;
 }
 
 export interface Log {
@@ -139,10 +131,6 @@ export interface Log {
   created_at: string;
 }
 
-// ------------------------------------------------------------------
-// Extended/joined types for UI and API responses
-// ------------------------------------------------------------------
-
 export interface WeekViewCell {
   shift: Shift;
   rota_shift: RotaShift | null;
@@ -152,7 +140,7 @@ export interface WeekViewCell {
 export interface WeekView {
   home_id: string;
   week_start: string;
-  days: Record<string, WeekViewCell[]>; // keyed by YYYY-MM-DD
+  days: Record<string, WeekViewCell[]>;
 }
 
 export interface RotaShiftDetailed extends RotaShift {
@@ -160,15 +148,19 @@ export interface RotaShiftDetailed extends RotaShift {
   staff: Staff | null;
 }
 
-// ------------------------------------------------------------------
-// Rules engine types
-// ------------------------------------------------------------------
-
 export interface RulesViolation {
   rule: string;
   message: string;
   current: number;
   limit: number;
+  severity?: 'block' | 'warn';
+}
+
+export interface RulesResult {
+  isValid: boolean;
+  violations: RulesViolation[];
+  warnings: string[];
+  gaps: Array<{ shiftId: string; shiftDate: string; required: number; actual: number }>;
 }
 
 export interface RulesCheckInput {
@@ -183,10 +175,6 @@ export interface RulesCheckResult {
   violations: RulesViolation[];
 }
 
-// ------------------------------------------------------------------
-// GDPR types
-// ------------------------------------------------------------------
-
 export interface StaffDataExport {
   staff: Staff;
   rota_shifts: (RotaShift & { shift_name: string })[];
@@ -194,9 +182,39 @@ export interface StaffDataExport {
   exported_at: string;
 }
 
-// ------------------------------------------------------------------
-// API request/response types
-// ------------------------------------------------------------------
+// Canonical camelCase facades (for new code)
+export interface StaffCanonical {
+  id: string;
+  clerkUserId: string;
+  homeId: string;
+  unitId: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  role: UserRole;
+  employmentType: EmploymentType | null;
+  contractedHours: number | null;
+  maxHoursWeek: number;
+  nightShiftsOk: boolean;
+  isActive: boolean;
+  deletedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LogCanonical {
+  id: string;
+  actorId: string | null;
+  homeId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  metadataJson: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
 
 export interface CreateHomePayload {
   homeName: string;
@@ -248,10 +266,6 @@ export interface CreateRulePayload {
   value: number;
 }
 
-// ------------------------------------------------------------------
-// Notification types
-// ------------------------------------------------------------------
-
 export interface ShiftReminderData {
   staff: Staff;
   shift: RotaShiftDetailed;
@@ -259,46 +273,6 @@ export interface ShiftReminderData {
 
 export interface GapAlertData {
   homeId: string;
-  homeName: string;
   weekStart: string;
-  unfilledCount: number;
-  managerEmail: string;
-}
-
-// ------------------------------------------------------------------
-// Session/Auth context types
-// ------------------------------------------------------------------
-
-export interface SessionContext {
-  userId: string;
-  role: AppRole;
-  homeId: string | null;
-}
-
-export interface SessionMetadata {
-  role?: AppRole;
-  homeId?: string;
-}
-
-// ------------------------------------------------------------------
-// Report types
-// ------------------------------------------------------------------
-
-export interface HoursReportRow {
-  staff: Staff;
-  shifts: RotaShiftDetailed[];
-  totalHours: number;
-}
-
-// ------------------------------------------------------------------
-// Utility types
-// ------------------------------------------------------------------
-
-export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
-
-export const DAYS_OF_WEEK: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-export interface DateRange {
-  start: string; // YYYY-MM-DD
-  end: string;   // YYYY-MM-DD
+  gapsCount: number;
 }

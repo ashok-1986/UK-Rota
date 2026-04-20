@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     SELECT rs.*, s.name AS shift_name, s.start_time::text AS shift_start_time,
            s.end_time::text AS shift_end_time, s.duration_hours, s.color
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${target.home_id}
     WHERE rs.staff_id = ${targetStaffId}
     ORDER BY rs.shift_date DESC
   `

@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     SELECT rs.id, rs.staff_id, rs.shift_id, rs.shift_date::text AS shift_date,
            s.duration_hours::text AS duration_hours
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
     WHERE rs.home_id = ${homeId}
       AND rs.week_start = ${weekStart}
       AND rs.status = 'draft'
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
     SELECT rs.*, s.name AS shift_name, s.start_time::text AS shift_start_time, s.end_time::text AS shift_end_time,
            s.duration_hours, s.color
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
     WHERE rs.home_id = ${homeId}
       AND rs.week_start = ${weekStart}
       AND rs.staff_id IS NULL

@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       await clerk.users.updateUserMetadata(userId, {
         publicMetadata: {
           role: 'home_manager',
+          home_id: home.id,
           homeId: home.id,
         },
       })
