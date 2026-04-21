@@ -79,45 +79,46 @@ export default async function RootPage() {
   const thisWeek = now.toISOString().slice(0, 10)
 
   if (!homeId || !role) {
-    // JWT is missing metadata. Check what Clerk's backend actually has for this
-    // user — it may already be set (JWT propagation lag) or need repair from DB.
     const clerkUser = await (await clerkClient()).users.getUser(userId)
     const clerkPubMeta = clerkUser.publicMetadata as { role?: AppRole; homeId?: string } | undefined
 
     const repaired = await tryRepairMetadata(userId, clerkPubMeta)
+
     if (repaired) {
-      redirect('/account-not-linked?linked=1')
-    }
+      // Metadata exists on Clerk backend — JWT was just stale; fall through to role-based redirect
+      role = repaired.role
+      homeId = repaired.homeId
+    } else {
+      // No staff record exists for this user
+      const needsSetup = await checkNeedsSetup()
 
-    // No staff record found — check if the whole system needs first-time setup
-    const needsSetup = await checkNeedsSetup()
-
-    if (needsSetup) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to CareRota</h1>
-            <p className="text-gray-600 mb-6">
-              It looks like this is your first time here. Let&apos;s set up your care home.
-            </p>
-            <form action="/api/setup/first-home" method="POST" className="space-y-4">
-              <input type="hidden" name="homeName" value="My Care Home" />
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition"
-              >
-                Create My Care Home
-              </button>
-            </form>
-            <p className="text-sm text-gray-500 mt-4">
-              This will create a home and link your account as manager.
-            </p>
+      if (needsSetup) {
+        return (
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-sm text-center">
+              <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to CareRota</h1>
+              <p className="text-gray-600 mb-6">
+                It looks like this is your first time here. Let&apos;s set up your care home.
+              </p>
+              <form action="/api/setup/first-home" method="POST" className="space-y-4">
+                <input type="hidden" name="homeName" value="My Care Home" />
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition"
+                >
+                  Create My Care Home
+                </button>
+              </form>
+              <p className="text-sm text-gray-500 mt-4">
+                This will create a home and link your account as manager.
+              </p>
+            </div>
           </div>
-        </div>
-      )
-    }
+        )
+      }
 
-    redirect('/account-not-linked')
+      redirect('/account-not-linked')
+    }
   }
 
   if (role === 'system_admin') {
