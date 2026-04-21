@@ -1,4 +1,5 @@
 import { SignOutButton } from '@clerk/nextjs'
+import AccountLinkedRedirect from './AccountLinkedRedirect'
 
 export default async function AccountNotLinkedPage({
   searchParams,
@@ -20,12 +21,13 @@ export default async function AccountNotLinkedPage({
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Account Linked!</h1>
             <p className="text-gray-600 mb-6">
-              Your account has been linked to your care home. Sign out and sign back in to
-              load your updated session.
+              Your account has been linked to your care home.
             </p>
+            {/* Reloads the Clerk session JWT so fresh metadata is available, then redirects */}
+            <AccountLinkedRedirect />
             <SignOutButton redirectUrl="/sign-in">
-              <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition">
-                Sign Out &amp; Continue
+              <button className="mt-4 text-blue-600 text-sm hover:underline">
+                Or sign out and sign in manually
               </button>
             </SignOutButton>
           </>
