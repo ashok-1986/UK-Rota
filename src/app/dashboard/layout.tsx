@@ -12,11 +12,13 @@ export default async function DashboardLayout({
   const { userId, sessionClaims } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
+  const customMeta = (sessionClaims as Record<string, unknown> | null)
     ?.metadata as { role?: AppRole; homeId?: string } | undefined
+  const pubMeta = (sessionClaims as Record<string, unknown> | null)
+    ?.publicMetadata as { role?: AppRole; homeId?: string } | undefined
 
-  const role = metadata?.role
-  const homeId = metadata?.homeId
+  const role = customMeta?.role ?? pubMeta?.role
+  const homeId = customMeta?.homeId ?? pubMeta?.homeId
 
   const now = new Date()
   const day = now.getDay()
