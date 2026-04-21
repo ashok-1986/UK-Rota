@@ -116,7 +116,7 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   // 6. Tenant isolation validation
   const urlPath = request.nextUrl.pathname;
   const homeIdMatch = urlPath.match(/^\/homes\/([^/]+)/);
-  if (homeIdMatch && homeIdMatch[1] !== homeId && role !== 'system_admin') {
+  if (homeIdMatch && homeId && homeIdMatch[1] !== homeId && role !== 'system_admin') {
     return NextResponse.json({ error: 'Forbidden - Tenant mismatch' }, { status: 403 });
   }
 
