@@ -18,8 +18,21 @@ async function checkNeedsSetup(): Promise<boolean> {
   }
 }
 
-/** If the user has a staff record, sync Clerk metadata and return the staff row. */
-async function tryRepairMetadata(userId: string): Promise<{ role: AppRole; homeId: string } | null> {
+/**
+ * If Clerk publicMetadata already has role+homeId, return it (no DB/API call needed).
+ * Otherwise look up the staff record and sync it to Clerk.
+ * Returns null only when no staff record exists at all.
+ */
+async function tryRepairMetadata(
+  userId: string,
+  existingClerkMeta: { role?: AppRole; homeId?: string } | undefined,
+): Promise<{ role: AppRole; homeId: string } | null> {
+  // Metadata already set on the Clerk user — JWT is just stale (propagation delay).
+  // No repair needed; the user simply needs a fresh sign-in.
+  if (existingClerkMeta?.role && existingClerkMeta?.homeId) {
+    return { role: existingClerkMeta.role, homeId: existingClerkMeta.homeId }
+  }
+
   try {
     const [staff] = await sql`
       SELECT role, home_id FROM staff
@@ -66,10 +79,12 @@ export default async function RootPage() {
   const thisWeek = now.toISOString().slice(0, 10)
 
   if (!homeId || !role) {
-    // Try to self-heal: find the staff record in the DB and sync Clerk metadata.
-    // After repair, redirect to /account-not-linked?linked=1 so the user can
-    // sign out → sign in to get a fresh JWT with the new metadata.
-    const repaired = await tryRepairMetadata(userId)
+    // JWT is missing metadata. Check what Clerk's backend actually has for this
+    // user — it may already be set (JWT propagation lag) or need repair from DB.
+    const clerkUser = await (await clerkClient()).users.getUser(userId)
+    const clerkPubMeta = clerkUser.publicMetadata as { role?: AppRole; homeId?: string } | undefined
+
+    const repaired = await tryRepairMetadata(userId, clerkPubMeta)
     if (repaired) {
       redirect('/account-not-linked?linked=1')
     }
