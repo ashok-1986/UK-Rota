@@ -1,4 +1,4 @@
-import { auth } from '@clerk/nextjs/server'
+import { auth, currentUser } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
@@ -9,16 +9,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { userId, sessionClaims } = await auth()
+  const { userId } = await auth()
   if (!userId) redirect('/sign-in')
 
-  const customMeta = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-  const pubMeta = (sessionClaims as Record<string, unknown> | null)
-    ?.publicMetadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = customMeta?.role ?? pubMeta?.role
-  const homeId = customMeta?.homeId ?? pubMeta?.homeId
+  const user = await currentUser()
+  const role = user?.publicMetadata?.role as AppRole | undefined
+  const homeId = user?.publicMetadata?.homeId as string | undefined
 
   const now = new Date()
   const day = now.getDay()
