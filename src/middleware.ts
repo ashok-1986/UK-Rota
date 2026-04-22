@@ -115,8 +115,13 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
 
   // 6. Tenant isolation validation
   const urlPath = request.nextUrl.pathname;
+
+  // RSC prefetch requests fire before session is fully loaded — skip tenant check
+  const isRscPrefetch = request.headers.get('RSC') === '1' ||
+                        request.nextUrl.searchParams.has('_rsc');
+
   const homeIdMatch = urlPath.match(/^\/homes\/([^/]+)/);
-  if (homeIdMatch && homeId && homeIdMatch[1] !== homeId && role !== 'system_admin') {
+  if (!isRscPrefetch && homeIdMatch && homeId && homeIdMatch[1] !== homeId && role !== 'system_admin') {
     return NextResponse.json({ error: 'Forbidden - Tenant mismatch' }, { status: 403 });
   }
 

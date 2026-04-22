@@ -117,7 +117,7 @@ export default async function RootPage() {
         )
       }
 
-      redirect('/account-not-linked')
+      redirect('/account-not-linked?reason=new')
     }
   }
 

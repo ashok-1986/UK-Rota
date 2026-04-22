@@ -38,13 +38,15 @@ export default async function DashboardLayout({
                 >
                   Rota
                 </NavLink>
-                <NavLink 
+                <NavLink
                   href={homeId ? `/homes/${homeId}/staff` : '#'}
+                  prefetch={false}
                 >
                   Staff
                 </NavLink>
-                <NavLink 
+                <NavLink
                   href={homeId ? `/homes/${homeId}/settings/rules` : '#'}
+                  prefetch={false}
                 >
                   Settings
                 </NavLink>
@@ -69,10 +71,16 @@ export default async function DashboardLayout({
   )
 }
 
-function NavLink({ href, children, active }: { href: string; children: React.ReactNode; active?: boolean }) {
+function NavLink({ href, children, active, prefetch }: {
+  href: string
+  children: React.ReactNode
+  active?: boolean
+  prefetch?: boolean
+}) {
   return (
     <Link
       href={href}
+      prefetch={prefetch}
       className={`text-sm font-medium transition-colors ${
         active
           ? 'text-blue-700 border-b-2 border-blue-700 pb-1'

@@ -4,10 +4,11 @@ import AccountLinkedRedirect from './AccountLinkedRedirect'
 export default async function AccountNotLinkedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ linked?: string }>
+  searchParams: Promise<{ linked?: string; reason?: string }>
 }) {
-  const { linked } = await searchParams
+  const { linked, reason } = await searchParams
   const wasLinked = linked === '1'
+  const isNewUser = reason === 'new'
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -33,9 +34,14 @@ export default async function AccountNotLinkedPage({
           </>
         ) : (
           <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Account Not Linked</h1>
+            <div className="text-4xl mb-4">🏥</div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              {isNewUser ? 'Account Created' : 'Account Not Linked'}
+            </h1>
             <p className="text-gray-600 mb-6">
-              Your account is not linked to a care home. Please contact your administrator.
+              {isNewUser
+                ? 'Your account has been created. Your administrator needs to link you to a care home before you can access the system.'
+                : 'Your account is not linked to a care home. Please contact your administrator.'}
             </p>
             <SignOutButton redirectUrl="/sign-in">
               <button className="text-blue-600 text-sm hover:underline">
