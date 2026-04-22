@@ -31,6 +31,18 @@ export async function POST(req: NextRequest) {
   }
   const { shiftId, staffId, shiftDate, unitId, notes, override } = parsed.data
 
+  const [shift] = await sql`
+    SELECT id
+    FROM shifts
+    WHERE id = ${shiftId}
+      AND home_id = ${homeId}
+      AND is_active = TRUE
+    LIMIT 1
+  `
+  if (!shift) {
+    return NextResponse.json({ error: 'Shift not found for this home' }, { status: 404 })
+  }
+
   // Rules check (only when assigning a specific staff member)
   let violations: import('@/types').RulesViolation[] = []
   if (staffId) {

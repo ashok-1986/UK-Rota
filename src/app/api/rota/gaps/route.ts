@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       s.name AS shift_name,
       rs.staff_id
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
     WHERE rs.home_id = ${homeId}
       AND rs.week_start = ${week}
       AND rs.status != 'cancelled'

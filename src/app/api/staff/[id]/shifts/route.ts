@@ -48,7 +48,7 @@ export async function GET(
       s.start_time::text AS s_start_time, s.end_time::text AS s_end_time,
       s.duration_hours, s.color AS s_color
     FROM rota_shifts rs
-    JOIN shifts s ON s.id = rs.shift_id
+    JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${staff.home_id}
     WHERE rs.staff_id = ${id}
       AND rs.shift_date >= ${today}
     ORDER BY rs.shift_date, s.start_time

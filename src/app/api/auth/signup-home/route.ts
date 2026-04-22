@@ -26,11 +26,11 @@ export async function POST(req: NextRequest) {
 
     // 2. Create default shift templates
     await sql`
-      INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color)
+      INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color, is_night, is_weekend)
       VALUES 
-        (${home.id}, 'Early', '07:00:00', '15:00:00', 8, '#3B82F6'),
-        (${home.id}, 'Late', '14:00:00', '22:00:00', 8, '#8B5CF6'),
-        (${home.id}, 'Night', '22:00:00', '07:00:00', 9, '#6366F1')
+        (${home.id}, 'Early', '07:00:00', '15:00:00', 8, '#3B82F6', FALSE, FALSE),
+        (${home.id}, 'Late', '14:00:00', '22:00:00', 8, '#8B5CF6', FALSE, FALSE),
+        (${home.id}, 'Night', '22:00:00', '07:00:00', 9, '#6366F1', TRUE, FALSE)
     `
 
     // 3. Create default rules
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       await clerk.users.updateUserMetadata(userId, {
         publicMetadata: {
           role: 'home_manager',
+          home_id: home.id,
           homeId: home.id,
         },
       })

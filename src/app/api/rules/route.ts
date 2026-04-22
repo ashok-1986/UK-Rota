@@ -1,5 +1,5 @@
 // GET  /api/rules?homeId=  — fetch rules for a home (returns HomeRules object)
-// POST /api/rules           — upsert a single rule
+// POST /api/rules           — upsert default 3 rules for a home
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -9,8 +9,9 @@ import { writeAuditLog, getIp } from '@/lib/audit'
 
 const CreateSchema = z.object({
   homeId: z.string().uuid(),
-  ruleType: z.enum(['min_rest_hours', 'max_weekly_hours', 'max_consecutive_days']),
-  value: z.number().positive(),
+  minRestHours: z.number().positive().optional(),
+  maxWeeklyHours: z.number().positive().optional(),
+  maxConsecutiveDays: z.number().positive().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -45,7 +46,12 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation error', issues: parsed.error.flatten() }, { status: 400 })
   }
-  const { homeId, ruleType, value } = parsed.data
+  const {
+    homeId,
+    minRestHours = 11,
+    maxWeeklyHours = 48,
+    maxConsecutiveDays = 6,
+  } = parsed.data
 
   const role = req.headers.get('x-user-role')
   const headerHomeId = req.headers.get('x-home-id')
@@ -55,22 +61,33 @@ export async function POST(req: NextRequest) {
 
   const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
 
-  const [rule] = await sql`
+  await sql`
     INSERT INTO rules (home_id, rule_type, value)
-    VALUES (${homeId}, ${ruleType}, ${value})
-    ON CONFLICT (home_id, rule_type) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-    RETURNING *
+    VALUES
+      (${homeId}, 'min_rest_hours', ${minRestHours}),
+      (${homeId}, 'max_weekly_hours', ${maxWeeklyHours}),
+      (${homeId}, 'max_consecutive_days', ${maxConsecutiveDays})
+    ON CONFLICT (home_id, rule_type)
+    DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
   `
+
+  const rows = await sql`
+    SELECT rule_type, value
+    FROM rules
+    WHERE home_id = ${homeId}
+      AND is_active = TRUE
+    ORDER BY rule_type
+  ` as { rule_type: string; value: number }[]
 
   await writeAuditLog({
     homeId,
     actorId: actor?.id ?? null,
     action: 'rules.updated',
     entityType: 'rules',
-    entityId: rule.id,
-    metadata: { ruleType, value },
+    entityId: null,
+    metadata: { minRestHours, maxWeeklyHours, maxConsecutiveDays },
     ipAddress: getIp(req),
   })
 
-  return NextResponse.json(rule, { status: 201 })
+  return NextResponse.json(parseRules(rows), { status: 201 })
 }

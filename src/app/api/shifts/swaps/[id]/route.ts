@@ -38,10 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     FROM shift_swaps ss
     JOIN staff s1 ON s1.id = ss.requester_id
     JOIN rota_shifts rs1 ON rs1.id = ss.requester_shift_id
-    JOIN shifts sh1 ON sh1.id = rs1.shift_id
+    JOIN shifts sh1 ON sh1.id = rs1.shift_id AND sh1.home_id = s1.home_id
     LEFT JOIN staff s2 ON s2.id = ss.target_id
     LEFT JOIN rota_shifts rs2 ON rs2.id = ss.target_shift_id
-    LEFT JOIN shifts sh2 ON sh2.id = rs2.shift_id
+    LEFT JOIN shifts sh2 ON sh2.id = rs2.shift_id AND sh2.home_id = s1.home_id
     WHERE ss.id = ${id}
     LIMIT 1
   `

@@ -31,7 +31,7 @@ export async function writeAuditLog(params: AuditParams): Promise<void> {
         ${params.entityType},
         ${params.entityId ?? null},
         ${JSON.stringify(params.metadata ?? {})}::jsonb,
-        ${params.ipAddress ?? null}::inet
+        ${params.ipAddress ?? null}
       )
     `
   } catch (err) {

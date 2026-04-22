@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     const gaps = await sql`
       SELECT rs.shift_date::text as date, s.name as shift_name, s.start_time::text as start_time
       FROM rota_shifts rs
-      JOIN shifts s ON s.id = rs.shift_id
+      JOIN shifts s ON s.id = rs.shift_id AND s.home_id = ${homeId}
       WHERE rs.home_id = ${homeId}
         AND rs.week_start = ${weekStartStr}
         AND rs.staff_id IS NULL
