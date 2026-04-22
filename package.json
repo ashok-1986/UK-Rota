@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.1.0",
+    "@kinde-oss/kinde-auth-nextjs": "^2.12.1",
     "@neondatabase/serverless": "^0.9.3",
     "@react-pdf/renderer": "^3.4.4",
     "clsx": "^2.1.1",

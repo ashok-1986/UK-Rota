@@ -1,6 +1,6 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
+import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import { redirect } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
 import Link from 'next/link'
 import type { AppRole } from '@/types'
 
@@ -9,12 +9,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { userId } = await auth()
-  if (!userId) redirect('/sign-in')
+  const { isAuthenticated } = getKindeServerSession()
+  if (!(await isAuthenticated())) redirect('/sign-in')
 
-  const user = await currentUser()
-  const role = user?.publicMetadata?.role as AppRole | undefined
-  const homeId = user?.publicMetadata?.homeId as string | undefined
+  // TODO Phase 2: read role + homeId from Kinde custom claims
+  const role = undefined as AppRole | undefined
+  const homeId = undefined as string | undefined
 
   const now = new Date()
   const day = now.getDay()
@@ -30,10 +30,10 @@ export default async function DashboardLayout({
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-8">
               <Link href="/" className="text-xl font-bold text-blue-900">CareRota</Link>
-              
+
               <nav className="hidden md:flex items-center gap-6">
-                <NavLink 
-                  href={homeId ? `/dashboard/rota/${homeId}/${thisWeek}` : '#'} 
+                <NavLink
+                  href={homeId ? `/dashboard/rota/${homeId}/${thisWeek}` : '#'}
                   active={true}
                 >
                   Rota
@@ -57,7 +57,9 @@ export default async function DashboardLayout({
               <span className="text-xs text-gray-500 hidden sm:block">
                 {role === 'system_admin' ? 'Admin' : role === 'home_manager' ? 'Manager' : 'Staff'}
               </span>
-              <UserButton />
+              <LogoutLink className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                Sign out
+              </LogoutLink>
             </div>
           </div>
         </div>
