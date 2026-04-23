@@ -1,8 +1,8 @@
-// GET  /api/rules?homeId=  — fetch rules for a home (returns HomeRules object)
-// POST /api/rules           — upsert a single rule
-import { auth } from '@clerk/nextjs/server'
+// GET  /api/rules?homeId= — fetch rules for a home
+// POST /api/rules         — upsert a single rule
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { parseRules } from '@/lib/rules'
 import { writeAuditLog, getIp } from '@/lib/audit'
@@ -14,17 +14,15 @@ const CreateSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
-  const homeId = searchParams.get('homeId') ?? req.headers.get('x-home-id')
+  const homeId = searchParams.get('homeId') ?? headerHomeId
   if (!homeId) return NextResponse.json({ error: 'homeId is required' }, { status: 400 })
 
-  const role = req.headers.get('x-user-role')
-  const headerHomeId = req.headers.get('x-home-id')
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const rows = await sql`
@@ -37,8 +35,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const body = await req.json()
   const parsed = CreateSchema.safeParse(body)
@@ -47,10 +45,8 @@ export async function POST(req: NextRequest) {
   }
   const { homeId, ruleType, value } = parsed.data
 
-  const role = req.headers.get('x-user-role')
-  const headerHomeId = req.headers.get('x-home-id')
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`

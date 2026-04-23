@@ -1,11 +1,10 @@
-// GET  /api/staff?homeId=  — list active staff for a home
-// POST /api/staff          — create a staff member (creates Clerk user + DB row)
-import { auth, clerkClient } from '@clerk/nextjs/server'
+// GET  /api/staff?homeId= — list active staff for a home
+// POST /api/staff         — create a staff member (DB record only; Kinde user created separately)
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const CreateSchema = z.object({
   homeId: z.string().uuid(),
@@ -17,28 +16,26 @@ const CreateSchema = z.object({
   role: z.enum(['home_manager', 'care_staff', 'bank_staff']),
   employmentType: z.enum(['full_time', 'part_time', 'bank']),
   contractedHours: z.number().positive().max(168).optional(),
-  password: z.string().min(8).max(100),
+  // kindeUserId: the Kinde user ID to link — admin must create the Kinde user first
+  // via Kinde Dashboard or Management API, then provide the ID here.
+  kindeUserId: z.string().optional(),
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
-  const homeId = searchParams.get('homeId') ?? req.headers.get('x-home-id')
+  const homeId = searchParams.get('homeId') ?? headerHomeId
   const unitId = searchParams.get('unitId')
   if (!homeId) return NextResponse.json({ error: 'homeId is required' }, { status: 400 })
 
-  // Managers can only see staff for their own home
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   let staff
   if (unitId) {
-    // Filter by unit (for unit managers)
     staff = await sql`
       SELECT s.*, u.name AS unit_name
       FROM staff s
@@ -63,8 +60,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const body = await req.json()
   const parsed = CreateSchema.safeParse(body)
@@ -73,41 +70,23 @@ export async function POST(req: NextRequest) {
   }
   const d = parsed.data
 
-  // Managers can only add staff to their own home
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
   if (role !== 'system_admin' && d.homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Get actor staff record for audit
   const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
 
-  // Create Clerk user
-  const clerk = await clerkClient()
-  let clerkUser
-  try {
-    clerkUser = await clerk.users.createUser({
-      emailAddress: [d.email],
-      password: d.password,
-      firstName: d.firstName,
-      lastName: d.lastName,
-      publicMetadata: {
-        role: d.role,
-        homeId: d.homeId,
-      },
-    })
-  } catch (err) {
-    console.error('[staff] Clerk user creation failed:', err)
-    return NextResponse.json({ error: 'Failed to create Clerk account' }, { status: 500 })
-  }
+  // TODO Phase 3: create Kinde user via Kinde Management API and get kindeUserId automatically.
+  // For now, admin must create the Kinde user in Kinde Dashboard and provide kindeUserId here,
+  // OR leave it blank (clerk_user_id will be null until linked).
+  const kindeUserId = d.kindeUserId ?? null
 
   const [staffRow] = await sql`
     INSERT INTO staff
       (home_id, unit_id, clerk_user_id, first_name, last_name, email, phone,
        role, employment_type, contracted_hours)
     VALUES
-      (${d.homeId}, ${d.unitId ?? null}, ${clerkUser.id},
+      (${d.homeId}, ${d.unitId ?? null}, ${kindeUserId},
        ${d.firstName}, ${d.lastName}, ${d.email}, ${d.phone ?? null},
        ${d.role}, ${d.employmentType}, ${d.contractedHours ?? null})
     RETURNING *

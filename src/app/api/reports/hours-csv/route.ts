@@ -1,18 +1,17 @@
-// GET /api/reports/hours-csv?homeId=&week=YYYY-MM-DD
-// Returns a CSV of weekly hours per staff member
-import { auth } from '@clerk/nextjs/server'
+// GET /api/reports/hours-csv?homeId=&week=YYYY-MM-DD — CSV of weekly hours per staff member
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { buildHoursCsv } from '@/lib/csv'
 import { validateWeekStart } from '@/lib/utils'
 import type { Staff, RotaShiftDetailed } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
-  const homeId = searchParams.get('homeId') ?? req.headers.get('x-home-id')
+  const homeId = searchParams.get('homeId') ?? headerHomeId
   const week = searchParams.get('week')
 
   if (!homeId || !week) {
@@ -25,13 +24,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 })
   }
 
-  const role = req.headers.get('x-user-role')
-  const headerHomeId = req.headers.get('x-home-id')
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Fetch all assigned shifts for the week
   const rows = await sql`
     SELECT
       st.id, st.home_id, st.unit_id, st.clerk_user_id, st.first_name, st.last_name,
@@ -52,7 +48,6 @@ export async function GET(req: NextRequest) {
     ORDER BY st.last_name, st.first_name, rs.shift_date
   `
 
-  // Group by staff member
   const staffMap = new Map<string, { staff: Staff; shifts: RotaShiftDetailed[]; totalHours: number }>()
 
   for (const row of rows) {

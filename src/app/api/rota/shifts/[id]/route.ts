@@ -1,8 +1,7 @@
-// PUT /api/rota/shifts/[id]
-// Update a rota_shift: status, staff assignment, notes
-import { auth } from '@clerk/nextjs/server'
+// PUT /api/rota/shifts/[id] — update a rota_shift: status, staff assignment, notes
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
 
@@ -16,21 +15,16 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role')
 
-  const [rotaShift] = await sql`
-    SELECT * FROM rota_shifts WHERE id = ${id} LIMIT 1
-  `
+  const [rotaShift] = await sql`SELECT * FROM rota_shifts WHERE id = ${id} LIMIT 1`
   if (!rotaShift) return NextResponse.json({ error: 'Rota shift not found' }, { status: 404 })
 
-  // Home access guard
   if (role !== 'system_admin' && rotaShift.home_id !== homeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   // Staff can only confirm/cancel their own shifts
@@ -50,8 +44,7 @@ export async function PUT(
   }
   const { status, staffId, notes } = parsed.data
 
-  const confirmedAt =
-    status === 'confirmed' ? new Date().toISOString() : rotaShift.confirmed_at
+  const confirmedAt = status === 'confirmed' ? new Date().toISOString() : rotaShift.confirmed_at
 
   const [updated] = await sql`
     UPDATE rota_shifts SET
@@ -64,9 +57,7 @@ export async function PUT(
     RETURNING *
   `
 
-  const [actor] = await sql`
-    SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1
-  `
+  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: rotaShift.home_id,

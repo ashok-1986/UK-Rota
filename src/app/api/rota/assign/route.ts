@@ -1,8 +1,7 @@
-// POST /api/rota/assign
-// Creates a rota_shift entry after validating WTR rules
-import { auth } from '@clerk/nextjs/server'
+// POST /api/rota/assign — create a rota_shift after validating WTR rules
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { checkRules } from '@/lib/rules-engine'
 import { writeAuditLog, getIp } from '@/lib/audit'
@@ -18,10 +17,7 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
+  const { userId, homeId } = getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const body = await req.json()
@@ -31,7 +27,6 @@ export async function POST(req: NextRequest) {
   }
   const { shiftId, staffId, shiftDate, unitId, notes, override } = parsed.data
 
-  // Rules check (only when assigning a specific staff member)
   let violations: import('@/types').RulesViolation[] = []
   if (staffId) {
     const result = await checkRules({ staffId, shiftId, shiftDate, homeId })
@@ -46,13 +41,11 @@ export async function POST(req: NextRequest) {
 
   const weekStart = getWeekStart(shiftDate)
 
-  // Get actor staff record
   const [actor] = await sql`
     SELECT id FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
   `
   if (!actor) return NextResponse.json({ error: 'Actor staff record not found' }, { status: 404 })
 
-  // Check for existing non-cancelled assignment on same date+shift
   const [existing] = await sql`
     SELECT id FROM rota_shifts
     WHERE home_id = ${homeId}

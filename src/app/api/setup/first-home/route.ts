@@ -1,14 +1,11 @@
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
-import { clerkClient } from '@clerk/nextjs/server'
 
 // POST /api/setup/first-home - Create first home and link current user as manager
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized - must be signed in' }, { status: 401 })
-  }
+  const { userId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   // Check if any homes exist
   const [existingHome] = await sql`SELECT id FROM homes LIMIT 1`
@@ -17,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { homeName, homeAddress } = body
+  const { homeName, homeAddress, firstName, lastName, email } = body
 
   try {
     // 1. Create home
@@ -30,7 +27,7 @@ export async function POST(req: NextRequest) {
     // 2. Create default shift templates
     await sql`
       INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color, is_night, is_weekend)
-      VALUES 
+      VALUES
         (${home.id}, 'Early', '07:00:00', '15:00:00', 8, '#3B82F6', FALSE, FALSE),
         (${home.id}, 'Late', '14:00:00', '22:00:00', 8, '#8B5CF6', FALSE, FALSE),
         (${home.id}, 'Night', '22:00:00', '07:00:00', 9, '#6366F1', TRUE, FALSE)
@@ -39,52 +36,30 @@ export async function POST(req: NextRequest) {
     // 3. Create default rules
     await sql`
       INSERT INTO rules (home_id, rule_type, value)
-      VALUES 
+      VALUES
         (${home.id}, 'min_rest_hours', 11),
         (${home.id}, 'max_weekly_hours', 48),
         (${home.id}, 'max_consecutive_days', 6)
     `
 
-    // 4. Get user info from Clerk
-    const clerk = await clerkClient()
-    let userEmail = 'admin@carehome.co.uk'
-    let userFirstName = 'Manager'
-    let userLastName = ''
-
-    try {
-      const user = await clerk.users.getUser(userId)
-      userEmail = user.emailAddresses[0]?.emailAddress ?? userEmail
-      userFirstName = user.firstName ?? userFirstName
-      userLastName = user.lastName ?? ''
-    } catch (e) {
-      console.warn('Could not fetch Clerk user details')
-    }
-
-    // 5. Create staff record
+    // 4. Create staff record linked to current Kinde user
+    // firstName/lastName/email can be passed in body; caller should provide these
+    // since we no longer call Kinde Management API to fetch user details here.
     const [staff] = await sql`
       INSERT INTO staff (clerk_user_id, home_id, first_name, last_name, email, role, is_active)
-      VALUES (${userId}, ${home.id}, ${userFirstName}, ${userLastName}, ${userEmail}, 'home_manager', TRUE)
+      VALUES (${userId ?? null}, ${home.id}, ${firstName ?? 'Manager'}, ${lastName ?? ''}, ${email ?? 'admin@carehome.co.uk'}, 'home_manager', TRUE)
       RETURNING id
     `
 
-    // 6. Update Clerk user metadata
-    try {
-      await clerk.users.updateUserMetadata(userId, {
-        publicMetadata: {
-          role: 'home_manager',
-          homeId: home.id,
-        },
-      })
-    } catch (e) {
-      console.error('Failed to update Clerk metadata:', e)
-    }
+    // TODO Phase 3: update Kinde user custom claims via Kinde Management API
+    // to set role: 'home_manager' and homeId: home.id so middleware can read them.
 
     return NextResponse.json({
       success: true,
       homeId: home.id,
       homeName: home.name,
       staffId: staff.id,
-      message: 'Home created and linked to your account. Please refresh.',
+      message: 'Home created. Set role=home_manager and homeId in Kinde custom claims for this user, then refresh.',
     })
   } catch (err) {
     console.error('Setup error:', err)

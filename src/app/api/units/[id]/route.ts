@@ -1,11 +1,10 @@
-// PUT /api/units/{id} - Update a unit
-// DELETE /api/units/{id} - Delete a unit
-import { auth } from '@clerk/nextjs/server'
+// PUT /api/units/{id} — update a unit
+// DELETE /api/units/{id} — delete a unit
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const UpdateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -16,12 +15,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId } = getSessionFromHeaders(req.headers)
+  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const { id } = await params
-  const homeId = req.headers.get('x-home-id')
-  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const [unit] = await sql`
     SELECT id, home_id, name, max_staff, created_at, updated_at
@@ -39,14 +36,11 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const role = req.headers.get('x-user-role') as AppRole
-  const headerHomeId = req.headers.get('x-home-id')
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const { id } = await params
@@ -57,13 +51,11 @@ export async function PUT(
   }
 
   const d = parsed.data
-  const name = d.name ?? null
-  const maxStaff = d.maxStaff ?? null
 
   const [unit] = await sql`
     UPDATE units SET
-      name = COALESCE(${name}, name),
-      max_staff = COALESCE(${maxStaff}, max_staff),
+      name = COALESCE(${d.name ?? null}, name),
+      max_staff = COALESCE(${d.maxStaff ?? null}, max_staff),
       updated_at = NOW()
     WHERE id = ${id} AND home_id = ${headerHomeId}
     RETURNING *
@@ -90,19 +82,15 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const role = req.headers.get('x-user-role') as AppRole
-  const headerHomeId = req.headers.get('x-home-id')
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const { id } = await params
 
-  // Check if unit has staff assigned
   const [staffCount] = await sql`
     SELECT COUNT(*) as count FROM staff WHERE unit_id = ${id} AND deleted_at IS NULL
   `

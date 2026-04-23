@@ -1,35 +1,18 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { getSession } from '@/lib/auth'
+import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import { StaffShiftList } from '@/components/shifts/StaffShiftList'
-import type { AppRole, RotaShiftDetailed } from '@/types'
+import type { RotaShiftDetailed } from '@/types'
 import Link from 'next/link'
-
-async function getMyShifts(staffId: string): Promise<RotaShiftDetailed[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-
-  // Fetch via the rota shifts API (filter by staff in DB)
-  // This hits the DB directly — we call the internal API here for consistency
-  // In production you'd call an internal server function instead
-  const res = await fetch(
-    `${baseUrl}/api/staff/${staffId}/shifts`,
-    { cache: 'no-store', credentials: 'include' }
-  )
-  if (!res.ok) return []
-  return res.json()
-}
+import sql from '@/lib/db'
 
 export default async function StaffRotaPage() {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
+  const { userId, role, homeId } = session
 
-  const role = metadata?.role
-  const homeId = metadata?.homeId
-
-  // Managers should use the dashboard rota view
+  // Managers use the dashboard rota view
   if (role === 'home_manager' || role === 'system_admin') {
     const now = new Date()
     const day = now.getDay()
@@ -38,14 +21,10 @@ export default async function StaffRotaPage() {
     redirect(`/dashboard/rota/${homeId}/${now.toISOString().slice(0, 10)}`)
   }
 
-  // Fetch shifts directly from DB via server action
-  // Import sql directly since this is a server component
-  const { default: sql } = await import('@/lib/db')
-
   const staffRows = await sql`
     SELECT id FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
   `
-  if (staffRows.length === 0) redirect('/sign-in')
+  if (staffRows.length === 0) redirect('/account-not-linked')
 
   const staffId = staffRows[0].id
   const today = new Date().toISOString().slice(0, 10)
@@ -103,14 +82,13 @@ export default async function StaffRotaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Nav */}
       <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/staff/rota" className="text-lg font-bold text-blue-900">CareRota</Link>
           <div className="flex items-center gap-3">
             <Link href="/swaps" className="text-xs text-gray-400 hover:text-gray-600">Swaps</Link>
             <a href="/privacy" className="text-xs text-gray-400 hover:text-gray-600">Privacy</a>
-            <UserButton />
+            <LogoutLink className="text-xs text-gray-400 hover:text-gray-600">Sign out</LogoutLink>
           </div>
         </div>
       </header>

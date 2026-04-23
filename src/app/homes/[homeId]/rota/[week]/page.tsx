@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
+import { getSession } from '@/lib/auth'
 import { RotaCalendar } from '@/components/rota/RotaCalendar'
-import type { AppRole, WeekView, Staff } from '@/types'
+import type { WeekView, Staff } from '@/types'
 
 interface PageProps {
   params: Promise<{ homeId: string; week: string }>
@@ -28,18 +28,12 @@ async function getStaff(homeId: string): Promise<Staff[]> {
 }
 
 export default async function RotaPage({ params }: PageProps) {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
   const { homeId, week } = await params
+  const { role, homeId: userHomeId } = session
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = metadata?.role
-  const userHomeId = metadata?.homeId
-
-  // Guard: managers can only view their own home's rota
   if (role !== 'system_admin' && homeId !== userHomeId) {
     redirect('/sign-in')
   }

@@ -1,11 +1,10 @@
-// PUT /api/shifts/{id} - Update a shift template
-// DELETE /api/shifts/{id} - Soft-delete a shift template
-import { auth } from '@clerk/nextjs/server'
+// PUT /api/shifts/{id} — update a shift template
+// DELETE /api/shifts/{id} — soft-delete a shift template
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const UpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -21,7 +20,7 @@ function calculateDuration(startTime: string, endTime: string): number {
   const [startH, startM] = startTime.split(':').map(Number)
   const [endH, endM] = endTime.split(':').map(Number)
   let duration = (endH + endM / 60) - (startH + startM / 60)
-  if (duration <= 0) duration += 24 // overnight
+  if (duration <= 0) duration += 24
   return duration
 }
 
@@ -29,12 +28,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId } = getSessionFromHeaders(req.headers)
+  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const { id } = await params
-  const homeId = req.headers.get('x-home-id')
-  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const [shift] = await sql`
     SELECT id, home_id, name, start_time::text AS start_time, end_time::text AS end_time,
@@ -53,14 +50,11 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const role = req.headers.get('x-user-role') as AppRole
-  const headerHomeId = req.headers.get('x-home-id')
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const { id } = await params
@@ -72,39 +66,28 @@ export async function PUT(
 
   const d = parsed.data
 
-  // Get current shift
   const [current] = await sql`
     SELECT start_time, end_time FROM shifts WHERE id = ${id} AND home_id = ${headerHomeId} LIMIT 1
   `
   if (!current) return NextResponse.json({ error: 'Shift not found' }, { status: 404 })
 
-  // Use COALESCE pattern like rules API
-  const name = d.name ?? null
-  const startTime = d.startTime ?? null
-  const endTime = d.endTime ?? null
-  const color = d.color ?? null
-  const isNight = d.isNight ?? null
-  const isWeekend = d.isWeekend ?? null
-  const isActive = d.isActive ?? null
-
-  // Calculate duration if times are being updated
   let duration: number | null = null
-  if (startTime || endTime) {
-    const newStart = startTime ?? current.start_time
-    const newEnd = endTime ?? current.end_time
+  if (d.startTime || d.endTime) {
+    const newStart = d.startTime ?? current.start_time
+    const newEnd = d.endTime ?? current.end_time
     duration = calculateDuration(String(newStart), String(newEnd))
   }
 
   const [shift] = await sql`
     UPDATE shifts SET
-      name = COALESCE(${name}, name),
-      start_time = COALESCE(${startTime}, start_time),
-      end_time = COALESCE(${endTime}, end_time),
+      name = COALESCE(${d.name ?? null}, name),
+      start_time = COALESCE(${d.startTime ?? null}, start_time),
+      end_time = COALESCE(${d.endTime ?? null}, end_time),
       duration_hours = COALESCE(${duration}, duration_hours),
-      color = COALESCE(${color}, color),
-      is_night = COALESCE(${isNight}, is_night),
-      is_weekend = COALESCE(${isWeekend}, is_weekend),
-      is_active = COALESCE(${isActive}, is_active),
+      color = COALESCE(${d.color ?? null}, color),
+      is_night = COALESCE(${d.isNight ?? null}, is_night),
+      is_weekend = COALESCE(${d.isWeekend ?? null}, is_weekend),
+      is_active = COALESCE(${d.isActive ?? null}, is_active),
       updated_at = NOW()
     WHERE id = ${id} AND home_id = ${headerHomeId}
     RETURNING *
@@ -131,14 +114,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const role = req.headers.get('x-user-role') as AppRole
-  const headerHomeId = req.headers.get('x-home-id')
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const { id } = await params

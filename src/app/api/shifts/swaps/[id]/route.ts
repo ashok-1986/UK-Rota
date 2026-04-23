@@ -1,11 +1,10 @@
 // GET /api/shifts/swaps/[id] - Get single swap request
 // PUT /api/shifts/swaps/[id] - Approve/reject/cancel swap request
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const UpdateSwapSchema = z.object({
   status: z.enum(['approved', 'rejected', 'cancelled']),
@@ -13,13 +12,11 @@ const UpdateSwapSchema = z.object({
 })
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
-  const { id } = await params
-
+  const { role, homeId } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
+
+  const { id } = await params
 
   const [swap] = await sql`
     SELECT 
@@ -54,14 +51,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-  const { id } = await params
-
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
+
+  const { id } = await params
 
   const body = await req.json()
   const parsed = UpdateSwapSchema.safeParse(body)
@@ -83,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Swap request not found' }, { status: 404 })
     }
 
-    const [reviewer] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} AND home_id = ${homeId} LIMIT 1`
+    const [reviewer] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId ?? ''} AND home_id = ${homeId} LIMIT 1`
 
     if (status === 'approved') {
       if (swap.target_shift_id) {

@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
 import { StaffTable } from '@/components/staff/StaffTable'
 import { AddStaffButton } from './AddStaffButton'
-import type { AppRole, Staff } from '@/types'
+import type { Staff } from '@/types'
 
 async function getStaff(homeId: string): Promise<Staff[]> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -15,14 +15,10 @@ async function getStaff(homeId: string): Promise<Staff[]> {
 }
 
 export default async function StaffPage() {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = metadata?.role
-  const homeId = metadata?.homeId
+  const { role, homeId } = session
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')

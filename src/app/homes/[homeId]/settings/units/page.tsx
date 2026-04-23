@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
 import { UnitForm } from '@/components/units/UnitForm'
 import { UnitsList } from '@/components/units/UnitsList'
-import type { AppRole, Unit } from '@/types'
+import type { Unit } from '@/types'
 
 interface PageProps {
   params: Promise<{ homeId: string }>
@@ -19,15 +19,11 @@ async function getUnits(homeId: string): Promise<Unit[]> {
 }
 
 export default async function UnitsPage({ params }: PageProps) {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
   const { homeId } = await params
-
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = metadata?.role
+  const { role } = session
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')

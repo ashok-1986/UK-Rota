@@ -1,73 +1,70 @@
-// =============================================================
-// Clerk server-side auth helpers
-// =============================================================
-import { auth } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
+// Central Kinde auth helper for CareRota.
+// Server components and API routes use these — never call getKindeServerSession() directly.
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
 import type { AppRole } from '@/types'
 
-/**
- * Asserts the current user has one of the given roles.
- * Redirects to /sign-in if not authenticated.
- * Returns the matched role.
- */
-export async function requireRole(...roles: AppRole[]): Promise<AppRole> {
-  const { sessionClaims } = await auth()
-  const role = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole } | undefined
+export interface AuthSession {
+  userId: string
+  role: AppRole | null
+  homeId: string | null
+  isAuthenticated: boolean
+}
 
-  if (!role?.role) {
-    redirect('/sign-in')
+export async function getSession(): Promise<AuthSession> {
+  const { getUser, isAuthenticated, getClaim } = getKindeServerSession()
+
+  const authenticated = await isAuthenticated()
+  if (!authenticated) {
+    return { userId: '', role: null, homeId: null, isAuthenticated: false }
   }
-  if (!roles.includes(role.role)) {
-    redirect('/sign-in')
+
+  const user = await getUser()
+  const roleClaim = await getClaim('role')
+  const homeIdClaim = await getClaim('homeId')
+
+  return {
+    userId: user?.id ?? '',
+    role: (roleClaim?.value as AppRole) ?? null,
+    homeId: (homeIdClaim?.value as string) ?? null,
+    isAuthenticated: true,
   }
-  return role.role
+}
+
+export async function requireAuth(): Promise<AuthSession> {
+  const session = await getSession()
+  if (!session.isAuthenticated || !session.userId) {
+    throw new Error('UNAUTHORIZED')
+  }
+  return session
+}
+
+export async function requireRole(allowed: AppRole | AppRole[]): Promise<AuthSession> {
+  const session = await requireAuth()
+  const allowedRoles = Array.isArray(allowed) ? allowed : [allowed]
+  if (!session.role || !allowedRoles.includes(session.role)) {
+    throw new Error('FORBIDDEN')
+  }
+  return session
 }
 
 /**
- * Returns the homeId stored in the session claims.
- * Throws if missing (should not happen for authenticated users).
+ * Read auth from headers injected by middleware.
+ * Faster than calling getSession() — use this in API routes.
  */
-export async function getHomeId(): Promise<string> {
-  const { sessionClaims } = await auth()
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { homeId?: string } | undefined
-
-  if (!metadata?.homeId) {
-    throw new Error('No homeId in session claims — is the Clerk JWT template configured?')
+export function getSessionFromHeaders(headers: Headers): {
+  userId: string | null
+  homeId: string | null
+  role: AppRole | null
+} {
+  return {
+    userId: headers.get('x-user-id'),
+    homeId: headers.get('x-home-id'),
+    role: headers.get('x-user-role') as AppRole | null,
   }
-  return metadata.homeId
 }
 
-/**
- * Returns both role and homeId from session claims.
- */
-export async function getSessionContext(): Promise<{ role: AppRole; homeId: string }> {
-  const { sessionClaims } = await auth()
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-
-  if (!metadata?.role || !metadata?.homeId) {
-    redirect('/sign-in')
-  }
-  return { role: metadata.role, homeId: metadata.homeId }
-}
-
-/**
- * Reads the x-home-id header injected by middleware.
- * Use this in API routes to avoid re-fetching session claims.
- */
-export function getHomeIdFromHeaders(headers: Headers): string {
-  const homeId = headers.get('x-home-id')
-  if (!homeId) throw new Error('Missing x-home-id header — check middleware configuration')
-  return homeId
-}
-
-/**
- * Reads the x-user-role header injected by middleware.
- */
-export function getRoleFromHeaders(headers: Headers): AppRole {
-  const role = headers.get('x-user-role') as AppRole | null
-  if (!role) throw new Error('Missing x-user-role header — check middleware configuration')
-  return role
+export function authError(type: 'UNAUTHORIZED' | 'FORBIDDEN') {
+  const status = type === 'UNAUTHORIZED' ? 401 : 403
+  const error = type === 'UNAUTHORIZED' ? 'Unauthorized' : 'Forbidden'
+  return Response.json({ error }, { status })
 }

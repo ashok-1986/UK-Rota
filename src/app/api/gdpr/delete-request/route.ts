@@ -1,12 +1,11 @@
 // POST /api/gdpr/delete-request
 // UK GDPR Article 17 — right to erasure
 // Soft-deletes the staff account; anonymisation happens after 30 days via retention cleanup
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const Schema = z.object({
   staffId: z.string().uuid(),
@@ -14,8 +13,8 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, role: _role } = getSessionFromHeaders(req.headers)
+  if (!_role) return authError('UNAUTHORIZED')
 
   const body = await req.json()
   const parsed = Schema.safeParse(body)
@@ -26,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Get requester
   const [requester] = await sql`
-    SELECT * FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
+    SELECT * FROM staff WHERE clerk_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
   `
   if (!requester) return NextResponse.json({ error: 'Requester not found' }, { status: 403 })
 
@@ -35,9 +34,8 @@ export async function POST(req: NextRequest) {
   `
   if (!target) return NextResponse.json({ error: 'Staff member not found or already deleted' }, { status: 404 })
 
-  const role = requester.role as AppRole
   const isSelf = requester.id === staffId
-  const isManager = ['home_manager', 'system_admin'].includes(role) && target.home_id === requester.home_id
+  const isManager = ['home_manager', 'system_admin'].includes(requester.role) && target.home_id === requester.home_id
 
   if (!isSelf && !isManager) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -50,13 +48,8 @@ export async function POST(req: NextRequest) {
     WHERE id = ${staffId}
   `
 
-  // Disable the Clerk account
-  const clerk = await clerkClient()
-  try {
-    await clerk.users.banUser(target.clerk_user_id)
-  } catch (err) {
-    console.error('[gdpr] Failed to disable Clerk account:', err)
-  }
+  // TODO Phase 3: disable Kinde account via Kinde Management API
+  // await kindeManagementClient.deleteUser(target.clerk_user_id)
 
   await writeAuditLog({
     homeId: target.home_id,

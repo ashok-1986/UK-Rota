@@ -1,20 +1,13 @@
-// GET /api/dashboard/stats?homeId= - Get home dashboard statistics
-import { auth } from '@clerk/nextjs/server'
+// GET /api/dashboard/stats — get home dashboard statistics
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
-import type { AppRole } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-  
-  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
+  const { homeId } = getSessionFromHeaders(req.headers)
+  if (!homeId) return authError('UNAUTHORIZED')
 
   try {
-    // Get current week dates
     const now = new Date()
     const day = now.getDay()
     const diff = day === 0 ? -6 : 1 - day
@@ -22,46 +15,42 @@ export async function GET(req: NextRequest) {
     weekStart.setDate(now.getDate() + diff)
     const weekStartStr = weekStart.toISOString().slice(0, 10)
 
-    // Staff counts
     const staffCounts = await sql`
-      SELECT 
+      SELECT
         COUNT(*) FILTER (WHERE is_active = TRUE AND deleted_at IS NULL) as active_staff,
         COUNT(*) FILTER (WHERE role = 'home_manager' AND is_active = TRUE AND deleted_at IS NULL) as managers,
         COUNT(*) FILTER (WHERE role = 'care_staff' AND is_active = TRUE AND deleted_at IS NULL) as care_staff,
         COUNT(*) FILTER (WHERE role = 'bank_staff' AND is_active = TRUE AND deleted_at IS NULL) as bank_staff
-      FROM staff 
+      FROM staff
       WHERE home_id = ${homeId}
     `
 
-    // This week's shifts
     const shiftsThisWeek = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total_shifts,
         COUNT(*) FILTER (WHERE status = 'draft') as draft_shifts,
         COUNT(*) FILTER (WHERE status = 'published') as published_shifts,
         COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed_shifts,
         COUNT(*) FILTER (WHERE staff_id IS NULL) as unfilled_shifts
-      FROM rota_shifts 
+      FROM rota_shifts
       WHERE home_id = ${homeId} AND week_start = ${weekStartStr}
     `
 
-    // Upcoming shifts (next 7 days)
     const today = new Date().toISOString().slice(0, 10)
     const nextWeek = new Date()
     nextWeek.setDate(nextWeek.getDate() + 7)
     const nextWeekStr = nextWeek.toISOString().slice(0, 10)
 
     const upcomingShifts = await sql`
-      SELECT 
+      SELECT
         COUNT(*) as total,
         COUNT(*) FILTER (WHERE staff_id IS NULL) as unfilled
-      FROM rota_shifts 
-      WHERE home_id = ${homeId} 
+      FROM rota_shifts
+      WHERE home_id = ${homeId}
         AND shift_date BETWEEN ${today} AND ${nextWeekStr}
         AND status != 'cancelled'
     `
 
-    // Unfilled shifts this week (gaps)
     const gaps = await sql`
       SELECT rs.shift_date::text as date, s.name as shift_name, s.start_time::text as start_time
       FROM rota_shifts rs
@@ -74,10 +63,9 @@ export async function GET(req: NextRequest) {
       LIMIT 5
     `
 
-    // Rules summary
     const rules = await sql`
       SELECT rule_type, value::text as value
-      FROM rules 
+      FROM rules
       WHERE home_id = ${homeId} AND is_active = TRUE
     `
 
@@ -99,7 +87,7 @@ export async function GET(req: NextRequest) {
         total: Number(upcomingShifts[0]?.total ?? 0),
         unfilled: Number(upcomingShifts[0]?.unfilled ?? 0),
       },
-      gaps: gaps,
+      gaps,
       rules: rules.reduce((acc, r) => ({ ...acc, [r.rule_type]: r.value }), {}),
     }
 

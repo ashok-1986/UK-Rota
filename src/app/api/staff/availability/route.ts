@@ -1,10 +1,9 @@
-// GET /api/staff/availability?staffId= - Get staff availability
-// POST /api/staff/availability - Set availability
-import { auth } from '@clerk/nextjs/server'
+// GET /api/staff/availability?staffId= — get staff availability
+// POST /api/staff/availability — set availability
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
-import type { AppRole } from '@/types'
 
 const SetAvailabilitySchema = z.object({
   staffId: z.string().uuid(),
@@ -12,14 +11,11 @@ const SetAvailabilitySchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
   const staffId = searchParams.get('staffId')
-  
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
 
   if (!staffId || !homeId) {
     return NextResponse.json({ error: 'staffId and homeId required' }, { status: 400 })
@@ -29,11 +25,10 @@ export async function GET(req: NextRequest) {
   if (role === 'care_staff' || role === 'bank_staff') {
     const [staff] = await sql`SELECT clerk_user_id FROM staff WHERE id = ${staffId} AND home_id = ${homeId} LIMIT 1`
     if (!staff || staff.clerk_user_id !== userId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return authError('FORBIDDEN')
     }
   }
 
-  // Get future availability (next 90 days)
   const today = new Date().toISOString().slice(0, 10)
   const future = new Date()
   future.setDate(future.getDate() + 90)
@@ -52,12 +47,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const body = await req.json()
@@ -68,9 +59,8 @@ export async function POST(req: NextRequest) {
 
   const { staffId, unavailableDates } = parsed.data
 
-  // Verify staff belongs to home
   const [staff] = await sql`
-    SELECT id, clerk_user_id FROM staff 
+    SELECT id, clerk_user_id FROM staff
     WHERE id = ${staffId} AND home_id = ${homeId} AND is_active = TRUE AND deleted_at IS NULL
     LIMIT 1
   `
@@ -78,22 +68,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
   }
 
-  // Staff can only update their own availability
   if ((role === 'care_staff' || role === 'bank_staff') && staff.clerk_user_id !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Delete existing future availability and insert new
   const today = new Date().toISOString().slice(0, 10)
-  
-  // Remove existing availability for these dates
+
   await sql`
     DELETE FROM staff_availability
     WHERE staff_id = ${staffId} AND date >= ${today}
   `
 
   if (unavailableDates.length > 0) {
-    // Insert new availability
     for (const date of unavailableDates) {
       await sql`
         INSERT INTO staff_availability (staff_id, date, reason)
@@ -102,10 +88,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ 
-    success: true, 
-    staffId, 
+  return NextResponse.json({
+    success: true,
+    staffId,
     unavailableDates,
-    message: `Availability updated for ${unavailableDates.length} dates`
+    message: `Availability updated for ${unavailableDates.length} dates`,
   })
 }

@@ -1,8 +1,7 @@
-// POST /api/rota/validate
-// Validates a potential shift assignment against WTR rules
-import { auth } from '@clerk/nextjs/server'
+// POST /api/rota/validate — validates a potential shift assignment against WTR rules
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import { checkRules } from '@/lib/rules-engine'
 
 const Schema = z.object({
@@ -12,10 +11,7 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
+  const { homeId } = getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const body = await req.json()

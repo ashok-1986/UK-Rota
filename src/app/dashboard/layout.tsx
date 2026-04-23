@@ -1,4 +1,4 @@
-import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
+import { getSession } from '@/lib/auth'
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -9,18 +9,29 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { isAuthenticated } = getKindeServerSession()
-  if (!(await isAuthenticated())) redirect('/sign-in')
+  const session = await getSession()
 
-  // TODO Phase 2: read role + homeId from Kinde custom claims
-  const role = undefined as AppRole | undefined
-  const homeId = undefined as string | undefined
+  if (!session.isAuthenticated || !session.userId) {
+    redirect('/sign-in')
+  }
+
+  const { role, homeId } = session
+
+  if (!role || !homeId) {
+    redirect('/account-not-linked?reason=claims-pending')
+  }
 
   const now = new Date()
   const day = now.getDay()
   const diff = day === 0 ? -6 : 1 - day
   now.setDate(now.getDate() + diff)
   const thisWeek = now.toISOString().slice(0, 10)
+
+  const roleLabel =
+    role === 'system_admin' ? 'Admin'
+    : role === 'home_manager' ? 'Manager'
+    : role === 'unit_manager' ? 'Unit Manager'
+    : 'Staff'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -32,31 +43,16 @@ export default async function DashboardLayout({
               <Link href="/" className="text-xl font-bold text-blue-900">CareRota</Link>
 
               <nav className="hidden md:flex items-center gap-6">
-                <NavLink
-                  href={homeId ? `/dashboard/rota/${homeId}/${thisWeek}` : '#'}
-                  active={true}
-                >
+                <NavLink href={`/dashboard/rota/${homeId}/${thisWeek}`} active={true}>
                   Rota
                 </NavLink>
-                <NavLink
-                  href={homeId ? `/homes/${homeId}/staff` : '#'}
-                  prefetch={false}
-                >
-                  Staff
-                </NavLink>
-                <NavLink
-                  href={homeId ? `/homes/${homeId}/settings/rules` : '#'}
-                  prefetch={false}
-                >
-                  Settings
-                </NavLink>
+                <NavLink href={`/homes/${homeId}/staff`}>Staff</NavLink>
+                <NavLink href={`/homes/${homeId}/settings/rules`}>Settings</NavLink>
               </nav>
             </div>
 
             <div className="flex items-center gap-4">
-              <span className="text-xs text-gray-500 hidden sm:block">
-                {role === 'system_admin' ? 'Admin' : role === 'home_manager' ? 'Manager' : 'Staff'}
-              </span>
+              <span className="text-xs text-gray-500 hidden sm:block">{roleLabel}</span>
               <LogoutLink className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
                 Sign out
               </LogoutLink>
@@ -73,16 +69,15 @@ export default async function DashboardLayout({
   )
 }
 
-function NavLink({ href, children, active, prefetch }: {
+function NavLink({ href, children, active }: {
   href: string
   children: React.ReactNode
   active?: boolean
-  prefetch?: boolean
 }) {
   return (
     <Link
       href={href}
-      prefetch={prefetch}
+      prefetch={false}
       className={`text-sm font-medium transition-colors ${
         active
           ? 'text-blue-700 border-b-2 border-blue-700 pb-1'

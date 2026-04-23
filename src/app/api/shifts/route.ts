@@ -1,11 +1,10 @@
-// GET /api/shifts?homeId= - List shift templates for a home
-// POST /api/shifts - Create a new shift template
-import { auth } from '@clerk/nextjs/server'
+// GET /api/shifts?homeId= — list shift templates for a home
+// POST /api/shifts — create a new shift template
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const CreateSchema = z.object({
   homeId: z.string().uuid(),
@@ -18,10 +17,7 @@ const CreateSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
+  const { homeId } = getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const shifts = await sql`
@@ -36,14 +32,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const body = await req.json()
@@ -55,14 +48,13 @@ export async function POST(req: NextRequest) {
   const { homeId, name, startTime, endTime, color, isNight, isWeekend } = parsed.data
 
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Calculate duration hours
   const [startH, startM] = startTime.split(':').map(Number)
   const [endH, endM] = endTime.split(':').map(Number)
   let duration = (endH + endM / 60) - (startH + startM / 60)
-  if (duration <= 0) duration += 24 // overnight shift
+  if (duration <= 0) duration += 24
 
   const [shift] = await sql`
     INSERT INTO shifts (home_id, name, start_time, end_time, duration_hours, color, is_night, is_weekend)

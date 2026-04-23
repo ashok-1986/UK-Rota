@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect, notFound } from 'next/navigation'
+import { getSession } from '@/lib/auth'
 import { RotaCalendar } from '@/components/rota/RotaCalendar'
 import sql from '@/lib/db'
-import type { AppRole, WeekView, Staff } from '@/types'
+import type { WeekView, Staff } from '@/types'
 
 interface PageProps {
   params: Promise<{ homeId: string; unitId: string; week: string }>
@@ -10,7 +10,7 @@ interface PageProps {
 
 async function getRotaData(homeId: string, week: string, unitId?: string): Promise<WeekView | null> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const url = unitId 
+  const url = unitId
     ? `${baseUrl}/api/rota/${homeId}/${week}?unitId=${unitId}`
     : `${baseUrl}/api/rota/${homeId}/${week}`
   const res = await fetch(url, { cache: 'no-store', credentials: 'include' })
@@ -29,32 +29,20 @@ async function getStaffForUnit(homeId: string, unitId: string): Promise<Staff[]>
 }
 
 export default async function UnitRotaPage({ params }: PageProps) {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
   const { homeId, unitId, week } = await params
+  const { role, homeId: userHomeId } = session
 
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string; unitId?: string } | undefined
-
-  const role = metadata?.role
-  const userHomeId = metadata?.homeId
-  const userUnitId = metadata?.unitId
-
-  // Unit managers can only view their assigned unit's rota
-  if (role !== 'unit_manager' && role !== 'home_manager' && role !== 'system_admin') {
+  if (!['unit_manager', 'home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')
   }
 
-  if (role === 'unit_manager') {
-    if (homeId !== userHomeId || unitId !== userUnitId) {
-      redirect('/dashboard')
-    }
-  } else if (role !== 'system_admin' && homeId !== userHomeId) {
+  if (role !== 'system_admin' && homeId !== userHomeId) {
     redirect('/sign-in')
   }
 
-  // Verify unit exists and belongs to home
   const [unit] = await sql`
     SELECT id, name FROM units WHERE id = ${unitId} AND home_id = ${homeId} LIMIT 1
   `
@@ -67,7 +55,7 @@ export default async function UnitRotaPage({ params }: PageProps) {
 
   if (!weekView) notFound()
 
-  const isManager = role === 'unit_manager' || role === 'home_manager' || role === 'system_admin'
+  const isManager = ['unit_manager', 'home_manager', 'system_admin'].includes(role ?? '')
 
   return (
     <div className="space-y-6">

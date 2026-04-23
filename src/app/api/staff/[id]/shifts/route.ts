@@ -1,20 +1,16 @@
-// GET /api/staff/[id]/shifts
-// Returns all shifts for a specific staff member (for staff portal view)
-import { auth } from '@clerk/nextjs/server'
+// GET /api/staff/[id]/shifts — all upcoming shifts for a specific staff member
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
-import type { AppRole } from '@/types'
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
-  const role = req.headers.get('x-user-role') as AppRole
-  const homeId = req.headers.get('x-home-id')
 
   // Staff can only view their own shifts
   if (role === 'care_staff' || role === 'bank_staff') {
@@ -22,18 +18,17 @@ export async function GET(
       SELECT id FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
     `
     if (staffRecord?.id !== id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return authError('FORBIDDEN')
     }
   }
 
-  // Verify staff exists and belongs to accessible home
   const [staff] = await sql`
     SELECT id, home_id FROM staff WHERE id = ${id} AND deleted_at IS NULL LIMIT 1
   `
   if (!staff) return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
 
   if (role !== 'system_admin' && staff.home_id !== homeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const today = new Date().toISOString().slice(0, 10)

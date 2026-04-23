@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/auth'
 import { ShiftForm } from '@/components/shifts/ShiftForm'
 import { ShiftsList } from '@/components/shifts/ShiftsList'
-import type { AppRole, Shift } from '@/types'
+import type { Shift } from '@/types'
 
 interface PageProps {
   params: Promise<{ homeId: string }>
@@ -19,15 +19,11 @@ async function getShifts(homeId: string): Promise<Shift[]> {
 }
 
 export default async function ShiftsPage({ params }: PageProps) {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
   const { homeId } = await params
-
-  const metadata = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = metadata?.role
+  const { role } = session
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')

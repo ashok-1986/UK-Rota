@@ -1,10 +1,9 @@
 // PUT /api/staff/[id] — update staff member details / soft-delete
-import { auth, clerkClient } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const UpdateSchema = z.object({
   unitId: z.string().uuid().nullable().optional(),
@@ -22,21 +21,18 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
 
-  // Fetch the target staff member to verify home ownership
   const [target] = await sql`
     SELECT * FROM staff WHERE id = ${id} AND deleted_at IS NULL LIMIT 1
   `
   if (!target) return NextResponse.json({ error: 'Staff member not found' }, { status: 404 })
 
   if (role !== 'system_admin' && target.home_id !== homeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const body = await req.json()
@@ -64,13 +60,8 @@ export async function PUT(
     RETURNING *
   `
 
-  // Sync role change to Clerk public metadata
-  if (d.role && d.role !== target.role) {
-    const clerk = await clerkClient()
-    await clerk.users.updateUserMetadata(target.clerk_user_id, {
-      publicMetadata: { role: d.role, homeId: target.home_id },
-    })
-  }
+  // TODO Phase 3: if role changed, update Kinde custom claims via Kinde Management API.
+  // For now, admin must update role in Kinde Dashboard manually.
 
   await writeAuditLog({
     homeId: target.home_id,

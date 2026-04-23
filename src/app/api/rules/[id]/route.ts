@@ -1,7 +1,7 @@
 // PUT /api/rules/[id] — update a rule value or toggle active
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
 
@@ -14,18 +14,16 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
 
   const [rule] = await sql`SELECT * FROM rules WHERE id = ${id} LIMIT 1`
   if (!rule) return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
 
-  const role = req.headers.get('x-user-role')
-  const homeId = req.headers.get('x-home-id')
   if (role !== 'system_admin' && rule.home_id !== homeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const body = await req.json()
@@ -37,8 +35,8 @@ export async function PUT(
 
   const [updated] = await sql`
     UPDATE rules SET
-      value      = COALESCE(${value ?? null}, value),
-      is_active  = COALESCE(${isActive ?? null}, is_active),
+      value     = COALESCE(${value ?? null}, value),
+      is_active = COALESCE(${isActive ?? null}, is_active),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

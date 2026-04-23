@@ -1,18 +1,17 @@
-// GET /api/reports/weekly-pdf?homeId=&week=YYYY-MM-DD
-// Streams a PDF of the weekly rota
-import { auth } from '@clerk/nextjs/server'
+// GET /api/reports/weekly-pdf?homeId=&week=YYYY-MM-DD — streams a PDF of the weekly rota
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { generateWeeklyPDF } from '@/lib/pdf'
 import { getWeekDays, validateWeekStart } from '@/lib/utils'
 import type { WeekView, WeekViewCell } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
-  const homeId = searchParams.get('homeId') ?? req.headers.get('x-home-id')
+  const homeId = searchParams.get('homeId') ?? headerHomeId
   const week = searchParams.get('week')
 
   if (!homeId || !week) {
@@ -25,17 +24,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 })
   }
 
-  const role = req.headers.get('x-user-role')
-  const headerHomeId = req.headers.get('x-home-id')
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Fetch home name
   const [home] = await sql`SELECT name FROM homes WHERE id = ${homeId} LIMIT 1`
   if (!home) return NextResponse.json({ error: 'Home not found' }, { status: 404 })
 
-  // Fetch shifts and assignments (same as rota GET route)
   const shifts = await sql`
     SELECT * FROM shifts WHERE home_id = ${homeId} AND is_active = TRUE ORDER BY start_time
   `
@@ -61,18 +56,11 @@ export async function GET(req: NextRequest) {
       )
       return {
         shift: {
-          id: shift.id as string,
-          home_id: shift.home_id as string,
-          name: shift.name as string,
-          start_time: shift.start_time as string,
-          end_time: shift.end_time as string,
-          duration_hours: Number(shift.duration_hours),
-          color: shift.color as string,
-          is_night: shift.is_night as boolean,
-          is_weekend: shift.is_weekend as boolean,
-          is_active: true,
-          created_at: '',
-          updated_at: '',
+          id: shift.id as string, home_id: shift.home_id as string, name: shift.name as string,
+          start_time: shift.start_time as string, end_time: shift.end_time as string,
+          duration_hours: Number(shift.duration_hours), color: shift.color as string,
+          is_night: shift.is_night as boolean, is_weekend: shift.is_weekend as boolean,
+          is_active: true, created_at: '', updated_at: '',
         },
         rota_shift: rs
           ? {
@@ -88,23 +76,12 @@ export async function GET(req: NextRequest) {
           : null,
         staff: rs?.staff_id
           ? {
-              id: rs.staff_id as string,
-              home_id: homeId,
-              unit_id: null,
-              clerk_user_id: '',
-              first_name: rs.staff_first_name as string,
-              last_name: rs.staff_last_name as string,
-              email: rs.staff_email as string,
-              phone: rs.staff_phone as string | null,
-              role: rs.staff_role as 'care_staff',
-              employment_type: 'full_time',
-              contracted_hours: null,
-              max_hours_week: 48,
-              night_shifts_ok: false,
-              is_active: true,
-              deleted_at: null,
-              created_at: '',
-              updated_at: '',
+              id: rs.staff_id as string, home_id: homeId, unit_id: null, clerk_user_id: '',
+              first_name: rs.staff_first_name as string, last_name: rs.staff_last_name as string,
+              email: rs.staff_email as string, phone: rs.staff_phone as string | null,
+              role: rs.staff_role as 'care_staff', employment_type: 'full_time',
+              contracted_hours: null, max_hours_week: 48, night_shifts_ok: false,
+              is_active: true, deleted_at: null, created_at: '', updated_at: '',
             }
           : null,
       }
@@ -112,7 +89,6 @@ export async function GET(req: NextRequest) {
   }
 
   const weekView: WeekView = { home_id: homeId, week_start: week, days: grid }
-
   const buffer = await generateWeeklyPDF(weekView, home.name)
 
   return new NextResponse(new Uint8Array(buffer), {

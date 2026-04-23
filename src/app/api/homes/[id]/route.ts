@@ -1,11 +1,10 @@
-// GET /api/homes/{id} - Get home details
-// PUT /api/homes/{id} - Update home details
-import { auth } from '@clerk/nextjs/server'
+// GET /api/homes/{id} — get home details
+// PUT /api/homes/{id} — update home details
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const UpdateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -19,16 +18,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
 
-  // Only allow viewing own home (or system_admin)
   if (role !== 'system_admin' && id !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const [home] = await sql`
@@ -45,20 +41,17 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
 
-  // Only home_manager or system_admin can update
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   if (role !== 'system_admin' && id !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const body = await req.json()
@@ -68,19 +61,14 @@ export async function PUT(
   }
 
   const d = parsed.data
-  const name = d.name ?? null
-  const address = d.address ?? null
-  const email = d.email ?? null
-  const timezone = d.timezone ?? null
-  const maxStaff = d.maxStaff ?? null
 
   const [home] = await sql`
     UPDATE homes SET
-      name = COALESCE(${name}, name),
-      address = COALESCE(${address}, address),
-      email = COALESCE(${email}, email),
-      timezone = COALESCE(${timezone}, timezone),
-      max_staff = COALESCE(${maxStaff}, max_staff),
+      name = COALESCE(${d.name ?? null}, name),
+      address = COALESCE(${d.address ?? null}, address),
+      email = COALESCE(${d.email ?? null}, email),
+      timezone = COALESCE(${d.timezone ?? null}, timezone),
+      max_staff = COALESCE(${d.maxStaff ?? null}, max_staff),
       updated_at = NOW()
     WHERE id = ${id}
     RETURNING *

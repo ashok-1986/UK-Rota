@@ -1,6 +1,6 @@
-import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { getSession } from '@/lib/auth'
+import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import Link from 'next/link'
 import type { AppRole } from '@/types'
 
@@ -26,7 +26,7 @@ interface DashboardStats {
   rules: Record<string, string>
 }
 
-async function getStats(homeId: string): Promise<DashboardStats | null> {
+async function getStats(): Promise<DashboardStats | null> {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const res = await fetch(
     `${baseUrl}/api/dashboard/stats`,
@@ -37,29 +37,21 @@ async function getStats(homeId: string): Promise<DashboardStats | null> {
 }
 
 export default async function DashboardPage() {
-  const { userId, sessionClaims } = await auth()
-  if (!userId) redirect('/sign-in')
+  const session = await getSession()
+  if (!session.isAuthenticated) redirect('/sign-in')
 
-  const customMeta = (sessionClaims as Record<string, unknown> | null)
-    ?.metadata as { role?: AppRole; homeId?: string } | undefined
-  const pubMeta = (sessionClaims as Record<string, unknown> | null)
-    ?.publicMetadata as { role?: AppRole; homeId?: string } | undefined
-
-  const role = customMeta?.role ?? pubMeta?.role
-  const homeId = customMeta?.homeId ?? pubMeta?.homeId
+  const { role, homeId } = session
 
   if (!homeId || !role) {
-    redirect('/account-not-linked')
+    redirect('/account-not-linked?reason=claims-pending')
   }
 
-  // Only managers see dashboard
   if (role === 'care_staff' || role === 'bank_staff') {
     redirect('/staff/rota')
   }
 
-  const stats = await getStats(homeId)
+  const stats = await getStats()
 
-  // Get current week
   const now = new Date()
   const day = now.getDay()
   const diff = day === 0 ? -6 : 1 - day
@@ -68,7 +60,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -88,17 +79,17 @@ export default async function DashboardPage() {
               </Link>
             </nav>
           </div>
-          <UserButton />
+          <LogoutLink className="text-sm text-gray-600 hover:text-gray-900">
+            Sign out
+          </LogoutLink>
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
 
         {stats && (
           <div className="space-y-6">
-            {/* Staff Overview */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <p className="text-sm text-gray-500">Total Staff</p>
@@ -118,10 +109,9 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* This Week */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">This Week's Shifts</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">This Week&apos;s Shifts</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total</span>
@@ -144,7 +134,7 @@ export default async function DashboardPage() {
                     <span className="font-semibold text-red-600">{stats.shifts.unfilled}</span>
                   </div>
                 </div>
-                <Link 
+                <Link
                   href={`/dashboard/rota/${homeId}/${thisWeek}`}
                   className="mt-4 block text-center text-blue-600 hover:text-blue-700 text-sm"
                 >
@@ -171,7 +161,7 @@ export default async function DashboardPage() {
                     <div className="space-y-1">
                       {stats.gaps.slice(0, 3).map((gap, i) => (
                         <div key={i} className="text-xs text-red-600">
-                          {gap.date}: {gap.shift_name} @ {gap.start_time?.slice(0,5)}
+                          {gap.date}: {gap.shift_name} @ {gap.start_time?.slice(0, 5)}
                         </div>
                       ))}
                     </div>
@@ -180,7 +170,6 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* Quick Links */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Link href={`/homes/${homeId}/settings/shifts`} className="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition">
                 <p className="font-medium text-gray-900">Shift Templates</p>

@@ -1,10 +1,9 @@
-// GET /api/shifts/swaps - List shift swap requests
-// POST /api/shifts/swaps - Create a new swap request
-import { auth } from '@clerk/nextjs/server'
+// GET /api/shifts/swaps — list shift swap requests
+// POST /api/shifts/swaps — create a new swap request
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
-import type { AppRole } from '@/types'
 
 const CreateSwapSchema = z.object({
   requesterShiftId: z.string().uuid(),
@@ -14,21 +13,18 @@ const CreateSwapSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
+  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') || 'pending'
-
-  if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   try {
     let swaps
     if (role === 'home_manager' || role === 'unit_manager' || role === 'system_admin') {
       swaps = await sql`
-        SELECT 
+        SELECT
           ss.id, ss.status, ss.reason, ss.response_note,
           ss.created_at, ss.updated_at,
           s1.id AS requester_staff_id,
@@ -53,8 +49,9 @@ export async function GET(req: NextRequest) {
         ORDER BY ss.created_at DESC
       `
     } else {
+      // Staff only see their own swaps — match via clerk_user_id
       swaps = await sql`
-        SELECT 
+        SELECT
           ss.id, ss.status, ss.reason, ss.response_note,
           ss.created_at, ss.updated_at,
           s1.id AS requester_staff_id,
@@ -88,12 +85,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-
+  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const body = await req.json()
@@ -106,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const [requester] = await sql`
-      SELECT id, first_name, last_name FROM staff 
+      SELECT id, first_name, last_name FROM staff
       WHERE clerk_user_id = ${userId} AND home_id = ${homeId} AND is_active = TRUE
       LIMIT 1
     `
@@ -115,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const [shift] = await sql`
-      SELECT id, staff_id, shift_date FROM rota_shifts 
+      SELECT id, staff_id, shift_date FROM rota_shifts
       WHERE id = ${requesterShiftId} AND home_id = ${homeId}
       LIMIT 1
     `

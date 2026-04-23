@@ -1,7 +1,6 @@
-// GET /api/rota/[homeId]/[week]
-// Returns the full week view: all shifts × all days, with assignments
-import { auth } from '@clerk/nextjs/server'
+// GET /api/rota/[homeId]/[week] — full week view with assignments
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { getWeekDays, validateWeekStart } from '@/lib/utils'
 import type { WeekView, WeekViewCell } from '@/types'
@@ -10,33 +9,27 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ homeId: string; week: string }> }
 ) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
   const { homeId, week } = await params
 
-  // Validate week is a Monday
   try {
     validateWeekStart(week)
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 })
   }
 
-  // Guard: managers can only see their own home
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role')
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
-  // Fetch all active shift templates for this home
   const shifts = await sql`
     SELECT * FROM shifts
     WHERE home_id = ${homeId} AND is_active = TRUE
     ORDER BY start_time
   `
 
-  // Fetch all rota_shifts for this week with joined staff
   const rotaShifts = await sql`
     SELECT
       rs.*,
@@ -61,7 +54,6 @@ export async function GET(
 
   const days = getWeekDays(week)
 
-  // Build the grid: days × shifts
   const grid: Record<string, WeekViewCell[]> = {}
   for (const day of days) {
     const dayShifts: WeekViewCell[] = shifts.map((shift: Record<string, unknown>) => {
@@ -128,11 +120,7 @@ export async function GET(
     grid[day] = dayShifts
   }
 
-  const weekView: WeekView = {
-    home_id: homeId,
-    week_start: week,
-    days: grid,
-  }
+  const weekView: WeekView = { home_id: homeId, week_start: week, days: grid }
 
   return NextResponse.json(weekView)
 }

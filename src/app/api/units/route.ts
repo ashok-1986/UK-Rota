@@ -1,11 +1,10 @@
-// GET /api/units?homeId= - List units for a home
-// POST /api/units - Create a new unit
-import { auth } from '@clerk/nextjs/server'
+// GET /api/units?homeId= — list units for a home
+// POST /api/units — create a new unit
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const CreateSchema = z.object({
   homeId: z.string().uuid(),
@@ -14,10 +13,7 @@ const CreateSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const homeId = req.headers.get('x-home-id')
+  const { homeId } = getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const units = await sql`
@@ -31,14 +27,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  if (!role) return authError('UNAUTHORIZED')
 
-  const headerHomeId = req.headers.get('x-home-id')
-  const role = req.headers.get('x-user-role') as AppRole
-
-  if (!['home_manager', 'system_admin'].includes(role ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!['home_manager', 'system_admin'].includes(role)) {
+    return authError('FORBIDDEN')
   }
 
   const body = await req.json()
@@ -50,7 +43,7 @@ export async function POST(req: NextRequest) {
   const { homeId, name, maxStaff } = parsed.data
 
   if (role !== 'system_admin' && homeId !== headerHomeId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return authError('FORBIDDEN')
   }
 
   const [unit] = await sql`

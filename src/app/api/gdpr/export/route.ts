@@ -1,15 +1,15 @@
 // GET /api/gdpr/export?staffId=
 // Returns all personal data for a staff member (UK GDPR Article 15 — right of access)
 // Accessible by: the staff member themselves, or their home manager / system_admin
-import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { StaffDataExport, AppRole } from '@/types'
+import type { StaffDataExport } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { userId, role: _role } = getSessionFromHeaders(req.headers)
+  if (!_role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
   const targetStaffId = searchParams.get('staffId')
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   // Get the requesting user's staff record
   const [requester] = await sql`
-    SELECT * FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
+    SELECT * FROM staff WHERE clerk_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
   `
   if (!requester) return NextResponse.json({ error: 'Requester staff record not found' }, { status: 403 })
 
@@ -27,11 +27,9 @@ export async function GET(req: NextRequest) {
   `
   if (!target) return NextResponse.json({ error: 'Staff member not found' }, { status: 404 })
 
-  const role = requester.role as AppRole
-
   // Access control: self, or manager/admin of the same home
   const isSelf = requester.id === targetStaffId
-  const isManager = ['home_manager', 'system_admin'].includes(role) && target.home_id === requester.home_id
+  const isManager = ['home_manager', 'system_admin'].includes(requester.role) && target.home_id === requester.home_id
 
   if (!isSelf && !isManager) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
