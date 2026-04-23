@@ -99,6 +99,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)|sign-in|sign-up|api/auth|privacy|api/webhooks|api/setup|api/notify|api/admin|$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)|sign-in|sign-up|api/auth/kinde|privacy|api/webhooks|api/setup|api/notify|api/admin|$).*)',
   ],
 }

@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     KINDE_POST_LOGIN_REDIRECT_URL:
       process.env.KINDE_POST_LOGIN_REDIRECT_URL ??
       `https://${process.env.VERCEL_URL}/dashboard`,
+    KINDE_AUTH_API_PATH: '/api/auth/kinde',
   },
 }
 
