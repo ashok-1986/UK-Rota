@@ -11,7 +11,7 @@ export interface AuthSession {
 }
 
 export async function getSession(): Promise<AuthSession> {
-  const { getUser, isAuthenticated, getAccessToken } = getKindeServerSession()
+  const { getUser, isAuthenticated, getIdToken } = getKindeServerSession()
 
   const authenticated = await isAuthenticated()
   if (!authenticated) {
@@ -19,14 +19,25 @@ export async function getSession(): Promise<AuthSession> {
   }
 
   const user = await getUser()
-  const token = await getAccessToken() as Record<string, unknown>
+
+  // Use getIdToken() instead of getAccessToken() — reads from cookie directly
+  // without making a network call to Kinde's token endpoint
+  const idToken = await getIdToken() as Record<string, unknown> | null
 
   // Kinde stores custom properties under user_properties.{key}.v
-  const userProps = token?.user_properties as
+  const userProps = idToken?.user_properties as
     Record<string, { v: string }> | undefined
 
-  const role = (userProps?.role?.v ?? null) as AppRole | null
-  const homeId = userProps?.homeid?.v ?? null
+  let role = (userProps?.role?.v ?? null) as AppRole | null
+  let homeId = userProps?.homeid?.v ?? null
+
+  // Fallback: read directly from known token claims
+  if (!role) {
+    role = (idToken?.role as AppRole) ?? null
+  }
+  if (!homeId) {
+    homeId = (idToken?.homeid as string) ?? null
+  }
 
   return {
     userId: user?.id ?? '',
