@@ -1,9 +1,8 @@
-// TEMPORARY — delete before final production deploy
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-    const { getClaim, getAccessToken, isAuthenticated, getUser } = getKindeServerSession()
+    const { getClaim, isAuthenticated, getUser, getAccessToken } = getKindeServerSession()
 
     const authenticated = await isAuthenticated()
     if (!authenticated) {
@@ -14,12 +13,14 @@ export async function GET() {
     const accessToken = await getAccessToken()
     const roleClaim = await getClaim('role')
     const homeIdClaim = await getClaim('homeId')
+    const rolesClaim = await getClaim('roles')
 
     return NextResponse.json({
-        user: { id: user?.id, email: user?.email },
-        accessToken,
+        userId: user?.id,
         roleClaim,
         homeIdClaim,
-        timestamp: new Date().toISOString(),
+        rolesClaim,
+        // accessToken contains the full decoded JWT — shows all claims available
+        accessToken,
     })
 }
