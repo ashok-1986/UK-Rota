@@ -2,7 +2,7 @@ import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  const { isAuthenticated, getUser, getIdToken } = getKindeServerSession()
+  const { isAuthenticated, getUser, getAccessTokenRaw } = getKindeServerSession()
 
   const authenticated = await isAuthenticated()
   if (!authenticated) {
@@ -10,16 +10,26 @@ export async function GET() {
   }
 
   const user = await getUser()
-  const idToken = await getIdToken() as Record<string, unknown> | null
+  const rawToken = await getAccessTokenRaw()
 
-  const userProps = idToken?.user_properties as
-    Record<string, { v: string }> | undefined
+  // Decode without network call
+  let payload = null
+  if (rawToken) {
+    try {
+      const parts = rawToken.split('.')
+      const padded = parts[1] + '=='.slice(0, (4 - parts[1].length % 4) % 4)
+      payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'))
+    } catch {
+      payload = { error: 'decode failed' }
+    }
+  }
 
   return NextResponse.json({
     userId: user?.id,
-    role: userProps?.role?.v ?? null,
-    homeId: userProps?.homeid?.v ?? null,
-    rawUserProperties: userProps,
-    fullIdToken: idToken,
+    rawTokenExists: !!rawToken,
+    decodedPayload: payload,
+    userProperties: payload?.user_properties,
+    role: payload?.user_properties?.role?.v ?? null,
+    homeId: payload?.user_properties?.homeid?.v ?? null,
   })
 }

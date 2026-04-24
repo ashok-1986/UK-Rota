@@ -10,8 +10,29 @@ export interface AuthSession {
   isAuthenticated: boolean
 }
 
+interface KindeTokenPayload {
+  sub?: string
+  user_properties?: Record<string, { v: string }>
+  org_code?: string
+  exp?: number
+}
+
+function decodeJwtPayload(token: string): KindeTokenPayload | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const payload = parts[1]
+    // Add padding if needed
+    const padded = payload + '=='.slice(0, (4 - payload.length % 4) % 4)
+    const decoded = Buffer.from(padded, 'base64').toString('utf-8')
+    return JSON.parse(decoded) as KindeTokenPayload
+  } catch {
+    return null
+  }
+}
+
 export async function getSession(): Promise<AuthSession> {
-  const { getUser, isAuthenticated, getIdToken } = getKindeServerSession()
+  const { getUser, isAuthenticated, getAccessTokenRaw } = getKindeServerSession()
 
   const authenticated = await isAuthenticated()
   if (!authenticated) {
@@ -20,24 +41,18 @@ export async function getSession(): Promise<AuthSession> {
 
   const user = await getUser()
 
-  // Use getIdToken() instead of getAccessToken() — reads from cookie directly
-  // without making a network call to Kinde's token endpoint
-  const idToken = await getIdToken() as Record<string, unknown> | null
+  // getAccessTokenRaw() reads JWT string from cookie — no network call
+  const rawToken = await getAccessTokenRaw()
 
-  // Kinde stores custom properties under user_properties.{key}.v
-  const userProps = idToken?.user_properties as
-    Record<string, { v: string }> | undefined
-
-  let role = (userProps?.role?.v ?? null) as AppRole | null
-  let homeId = userProps?.homeid?.v ?? null
-
-  // Fallback: read directly from known token claims
-  if (!role) {
-    role = (idToken?.role as AppRole) ?? null
+  if (!rawToken) {
+    return { userId: user?.id ?? '', role: null, homeId: null, isAuthenticated: true }
   }
-  if (!homeId) {
-    homeId = (idToken?.homeid as string) ?? null
-  }
+
+  const payload = decodeJwtPayload(rawToken)
+  const userProps = payload?.user_properties
+
+  const role = (userProps?.role?.v ?? null) as AppRole | null
+  const homeId = userProps?.homeid?.v ?? null
 
   return {
     userId: user?.id ?? '',
