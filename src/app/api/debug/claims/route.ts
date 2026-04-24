@@ -12,7 +12,7 @@ export async function GET() {
     const user = await getUser()
     const accessToken = await getAccessToken()
     const roleClaim = await getClaim('role')
-    const homeIdClaim = await getClaim('homeId')
+    const homeIdClaim = await getClaim('homeid')
     const rolesClaim = await getClaim('roles')
 
     return NextResponse.json({

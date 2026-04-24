@@ -20,7 +20,7 @@ export async function getSession(): Promise<AuthSession> {
 
   const user = await getUser()
   const roleClaim = await getClaim('role')
-  const homeIdClaim = await getClaim('homeId')
+  const homeIdClaim = await getClaim('homeid')
 
   return {
     userId: user?.id ?? '',
