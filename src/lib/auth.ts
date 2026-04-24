@@ -81,10 +81,6 @@ export async function requireRole(
   return session
 }
 
-/**
- * Read auth from headers injected by middleware.
- * Faster than calling getSession() — use this in API routes.
- */
 export function getSessionFromHeaders(headers: Headers): {
   userId: string | null
   homeId: string | null
