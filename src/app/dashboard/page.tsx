@@ -37,7 +37,13 @@ async function getStats(): Promise<DashboardStats | null> {
 }
 
 export default async function DashboardPage() {
-  const session = await getSession()
+  let session
+  try {
+    session = await getSession()
+  } catch (error) {
+    console.error('[dashboard/page] getSession failed:', error)
+    throw error
+  }
   if (!session.isAuthenticated) redirect('/sign-in')
 
   const { role, homeId } = session
