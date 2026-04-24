@@ -11,7 +11,7 @@ export interface AuthSession {
 }
 
 export async function getSession(): Promise<AuthSession> {
-  const { getUser, isAuthenticated, getClaim } = getKindeServerSession()
+  const { getUser, isAuthenticated, getAccessToken } = getKindeServerSession()
 
   const authenticated = await isAuthenticated()
   if (!authenticated) {
@@ -19,13 +19,19 @@ export async function getSession(): Promise<AuthSession> {
   }
 
   const user = await getUser()
-  const roleClaim = await getClaim('role')
-  const homeIdClaim = await getClaim('homeid')
+  const token = await getAccessToken() as Record<string, unknown>
+
+  // Kinde stores custom properties under user_properties.{key}.v
+  const userProps = token?.user_properties as
+    Record<string, { v: string }> | undefined
+
+  const role = (userProps?.role?.v ?? null) as AppRole | null
+  const homeId = userProps?.homeid?.v ?? null
 
   return {
     userId: user?.id ?? '',
-    role: (roleClaim?.value as AppRole) ?? null,
-    homeId: (homeIdClaim?.value as string) ?? null,
+    role,
+    homeId,
     isAuthenticated: true,
   }
 }
@@ -38,7 +44,9 @@ export async function requireAuth(): Promise<AuthSession> {
   return session
 }
 
-export async function requireRole(allowed: AppRole | AppRole[]): Promise<AuthSession> {
+export async function requireRole(
+  allowed: AppRole | AppRole[]
+): Promise<AuthSession> {
   const session = await requireAuth()
   const allowedRoles = Array.isArray(allowed) ? allowed : [allowed]
   if (!session.role || !allowedRoles.includes(session.role)) {
