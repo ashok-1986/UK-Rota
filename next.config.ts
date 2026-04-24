@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
     KINDE_POST_LOGOUT_REDIRECT_URL:
       process.env.KINDE_POST_LOGOUT_REDIRECT_URL ?? siteUrl,
     KINDE_POST_LOGIN_REDIRECT_URL:
-      process.env.KINDE_POST_LOGIN_REDIRECT_URL ?? `${siteUrl}/dashboard`,
+      process.env.KINDE_POST_LOGIN_REDIRECT_URL ?? siteUrl,
     KINDE_AUTH_API_PATH: '/api/auth/kinde',
   },
 }

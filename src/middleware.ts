@@ -55,8 +55,11 @@ export default withAuth(
       .kindeAuth?.token
 
     const userId = (token?.sub as string) ?? null
-    const role = (token?.role as AppRole) ?? null
-    const homeId = (token?.homeId as string) ?? null
+
+    // Kinde stores custom data in user_properties: { role: { v: "..." }, homeid: { v: "..." } }
+    const userProps = token?.user_properties as Record<string, { v: string }> | undefined
+    const role = (userProps?.role?.v ?? null) as AppRole | null
+    const homeId = userProps?.homeid?.v ?? null
 
     // 3. Admin guard
     if (isAdminRoute(pathname) && role !== 'system_admin') {
