@@ -3,8 +3,9 @@
 // Server-side only — never import this in client components
 // =============================================================
 import { Resend } from 'resend'
-import type { Staff, RotaShiftDetailed } from '@/types'
+import type { Staff, RotaShiftDetailed, AppRole } from '@/types'
 import { formatShortDate, formatTime, fullName } from './utils'
+import sql from './db'
 
 // Lazy-initialise clients so missing env vars don't crash non-notification paths
 let _resend: Resend | null = null
@@ -69,6 +70,44 @@ function gapAlertHtml(homeId: string, weekStart: string, unfilledCount: number):
   <p>Please log in to <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/rota/${homeId}/${weekStart}">CareRota</a> to assign staff.</p>
   <p style="color:#6b7280;font-size:12px;margin-top:32px">
     This email was sent by CareRota. Your data is processed in accordance with UK GDPR.
+  </p>
+</body>
+</html>`
+}
+
+function staffInviteHtml(homeName: string, role: AppRole, token: string): string {
+  const roleLabel =
+    role === 'home_manager' ? 'Home Manager'
+      : role === 'unit_manager' ? 'Unit Manager'
+        : role === 'care_staff' ? 'Care Staff'
+          : 'Bank Staff'
+
+  const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
+
+  return `
+<!DOCTYPE html>
+<html>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1f2937">
+  <h2 style="color:#2563eb">You're invited to CareRota</h2>
+  <p>Your home manager has invited you to join <strong>${homeName}</strong> as a <strong>${roleLabel}</strong>.</p>
+  <p>Click the button below to set up your account. This link expires in 72 hours.</p>
+  <p style="margin:24px 0">
+    <a href="${inviteUrl}"
+       style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600">
+      Accept Invitation
+    </a>
+  </p>
+  <p style="color:#6b7280;font-size:13px">
+    If the button doesn't work, copy and paste this URL into your browser:<br />
+    <a href="${inviteUrl}" style="color:#2563eb">${inviteUrl}</a>
+  </p>
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:32px 0" />
+  <p style="color:#6b7280;font-size:12px">
+    This email was sent by CareRota. Your personal data will be processed in
+    accordance with the UK General Data Protection Regulation (UK GDPR).
+    By accepting this invitation you consent to CareRota storing your name,
+    email, and shift records for workforce management purposes.
+    You may request data export or deletion at any time.
   </p>
 </body>
 </html>`
@@ -147,3 +186,33 @@ export async function sendGapAlert(
     console.error('[notify] Gap alert email failed:', err)
   }
 }
+
+/**
+ * Send a staff invitation email with a unique accept link.
+ * Looks up the home name from DB for the email subject/body.
+ */
+export async function sendStaffInvite(
+  email: string,
+  token: string,
+  role: AppRole,
+  homeId: string
+): Promise<void> {
+  const from = process.env.RESEND_FROM_EMAIL ?? 'noreply@carerota.co.uk'
+
+  // Look up home name for the email subject/body
+  const homes = await sql`SELECT name FROM homes WHERE id = ${homeId} LIMIT 1`
+  const homeName = (homes[0]?.name as string) ?? 'your care home'
+
+  try {
+    await getResend().emails.send({
+      from,
+      to: email,
+      subject: `You've been invited to join ${homeName} on CareRota`,
+      html: staffInviteHtml(homeName, role, token),
+    })
+  } catch (err) {
+    console.error('[notify] Staff invite email failed:', err)
+    throw err // Let caller know so it can log the failure
+  }
+}
+

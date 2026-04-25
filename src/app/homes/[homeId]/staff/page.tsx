@@ -1,17 +1,22 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth'
 import { StaffTable } from '@/components/staff/StaffTable'
-import { AddStaffButton } from './AddStaffButton'
+import { PendingInvites } from '@/components/staff/PendingInvites'
+import { StaffActions } from './StaffActions'
+import sql from '@/lib/db'
 import type { Staff } from '@/types'
 
+// Direct DB query — replaces self-fetch that broke with Kinde auth
 async function getStaff(homeId: string): Promise<Staff[]> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  const res = await fetch(
-    `${baseUrl}/api/staff?homeId=${homeId}`,
-    { cache: 'no-store', credentials: 'include' }
-  )
-  if (!res.ok) return []
-  return res.json()
+  const rows = await sql`
+    SELECT s.*, u.name AS unit_name
+    FROM staff s
+    LEFT JOIN units u ON u.id = s.unit_id
+    WHERE s.home_id = ${homeId}
+      AND s.deleted_at IS NULL
+    ORDER BY s.last_name, s.first_name
+  `
+  return rows as unknown as Staff[]
 }
 
 export default async function StaffPage() {
@@ -36,8 +41,10 @@ export default async function StaffPage() {
             Manage staff members for your care home.
           </p>
         </div>
-        <AddStaffButton homeId={homeId} />
+        <StaffActions homeId={homeId} />
       </div>
+
+      <PendingInvites />
 
       <StaffTable staff={staff} />
     </div>

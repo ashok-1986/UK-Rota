@@ -139,6 +139,21 @@ export interface Log {
   created_at: string;
 }
 
+export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'cancelled';
+
+export interface StaffInvite {
+  id: string;
+  home_id: string;
+  email: string;
+  role: AppRole;
+  invited_by: string;         // staff.id of the manager who sent it
+  token: string;              // 64-char crypto random hex token
+  status: InviteStatus;
+  expires_at: string;         // TIMESTAMPTZ — 72 hours from creation
+  accepted_at: string | null;
+  created_at: string;
+}
+
 // ------------------------------------------------------------------
 // Extended/joined types for UI and API responses
 // ------------------------------------------------------------------
