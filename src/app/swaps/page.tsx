@@ -1,14 +1,13 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { SwapsList } from '@/components/swaps/SwapsList'
 
 export default async function SwapsPage() {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const kindeAuth = await getKindeAuth()
+  if (!kindeAuth) redirect('/api/auth/kinde/login')
 
-  const { role } = session
+  const { role } = kindeAuth
 
-  if (!role) redirect('/')
   if (role === 'system_admin') redirect('/dashboard')
 
   return <SwapsList role={role} />

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import Link from 'next/link'
 import sql from '@/lib/db'
@@ -122,10 +122,10 @@ async function getStats(homeId: string): Promise<DashboardStats | null> {
 }
 
 export default async function DashboardPage() {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const kindeAuth = await getKindeAuth()
+  if (!kindeAuth) redirect('/api/auth/kinde/login')
 
-  const { role, homeId } = session
+  const { role, homeId } = kindeAuth
 
   if (!homeId || !role) {
     redirect('/account-not-linked?reason=claims-pending')

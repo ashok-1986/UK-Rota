@@ -1,6 +1,3 @@
-import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
-import AccountLinkedRedirect from './AccountLinkedRedirect'
-
 export default async function AccountNotLinkedPage({
   searchParams,
 }: {
@@ -30,10 +27,12 @@ export default async function AccountNotLinkedPage({
             <p className="text-gray-600 mb-6">
               Your account has been linked to your care home.
             </p>
-            <AccountLinkedRedirect />
-            <LogoutLink className="mt-4 block text-blue-600 text-sm hover:underline">
-              Or sign out and sign in manually
-            </LogoutLink>
+            <a
+              href="/api/auth/kinde/logout?post_logout_redirect_url=/"
+              className="text-blue-600 text-sm hover:underline"
+            >
+              Sign out and try another account
+            </a>
           </>
         ) : (
           <>
@@ -42,9 +41,12 @@ export default async function AccountNotLinkedPage({
               {reason === 'new' ? 'Account Created' : reason === 'claims-pending' ? 'Access Pending' : 'Account Not Linked'}
             </h1>
             <p className="text-gray-600 mb-6">{message}</p>
-            <LogoutLink className="text-blue-600 text-sm hover:underline">
+            <a
+              href="/api/auth/kinde/logout?post_logout_redirect_url=/"
+              className="text-blue-600 text-sm hover:underline"
+            >
               Sign out and try another account
-            </LogoutLink>
+            </a>
           </>
         )}
       </div>
