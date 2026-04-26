@@ -4,7 +4,7 @@ import sql from '@/lib/db'
 
 // POST /api/setup/first-home - Create first home and link current user as manager
 export async function POST(req: NextRequest) {
-  const { userId, role } = getSessionFromHeaders(req.headers)
+  const { userId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   // Check if any homes exist

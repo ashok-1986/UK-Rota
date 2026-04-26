@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromHeaders, authError } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  const { role } = getSessionFromHeaders(req.headers)
+  const { role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   // 2FA management is handled through Kinde's hosted account settings.

@@ -14,7 +14,7 @@ const CreateSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const body = await req.json()

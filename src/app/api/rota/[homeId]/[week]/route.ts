@@ -9,7 +9,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ homeId: string; week: string }> }
 ) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { homeId, week } = await params

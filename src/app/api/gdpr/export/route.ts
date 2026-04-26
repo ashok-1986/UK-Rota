@@ -8,7 +8,7 @@ import { writeAuditLog, getIp } from '@/lib/audit'
 import type { StaffDataExport } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { userId, role: _role } = getSessionFromHeaders(req.headers)
+  const { userId, role: _role } = await getSessionFromHeaders(req.headers)
   if (!_role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)

@@ -18,7 +18,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
@@ -41,7 +41,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params

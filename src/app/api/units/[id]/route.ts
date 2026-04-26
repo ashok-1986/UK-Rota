@@ -15,7 +15,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { homeId } = getSessionFromHeaders(req.headers)
+  const { homeId } = await getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const { id } = await params
@@ -36,7 +36,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   if (!['home_manager', 'system_admin'].includes(role)) {
@@ -82,7 +82,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   if (!['home_manager', 'system_admin'].includes(role)) {

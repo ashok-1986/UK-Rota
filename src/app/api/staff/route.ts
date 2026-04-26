@@ -1,7 +1,7 @@
-// GET  /api/staff?homeId= — list active staff for a home
-// POST /api/staff         — create a staff member (DB record only; Kinde user created separately)
+// POST /api/staff         — create a staff member (DB record only; Kinde user linked via invite flow)
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import crypto from 'crypto'
 import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 import { writeAuditLog, getIp } from '@/lib/audit'
@@ -16,13 +16,10 @@ const CreateSchema = z.object({
   role: z.enum(['home_manager', 'care_staff', 'bank_staff']),
   employmentType: z.enum(['full_time', 'part_time', 'bank']),
   contractedHours: z.number().positive().max(168).optional(),
-  // kindeUserId: the Kinde user ID to link — admin must create the Kinde user first
-  // via Kinde Dashboard or Management API, then provide the ID here.
-  kindeUserId: z.string().optional(),
 })
 
 export async function GET(req: NextRequest) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
@@ -60,7 +57,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const body = await req.json()
@@ -76,17 +73,15 @@ export async function POST(req: NextRequest) {
 
   const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
 
-  // TODO Phase 3: create Kinde user via Kinde Management API and get kindeUserId automatically.
-  // For now, admin must create the Kinde user in Kinde Dashboard and provide kindeUserId here,
-  // OR leave it blank (clerk_user_id will be null until linked).
-  const kindeUserId = d.kindeUserId ?? null
+  // Placeholder until Kinde webhook fires and updates with the real Kinde user ID
+  const pendingKindeId = `pending_kinde_${crypto.randomUUID()}`
 
   const [staffRow] = await sql`
     INSERT INTO staff
       (home_id, unit_id, clerk_user_id, first_name, last_name, email, phone,
        role, employment_type, contracted_hours)
     VALUES
-      (${d.homeId}, ${d.unitId ?? null}, ${kindeUserId},
+      (${d.homeId}, ${d.unitId ?? null}, ${pendingKindeId},
        ${d.firstName}, ${d.lastName}, ${d.email}, ${d.phone ?? null},
        ${d.role}, ${d.employmentType}, ${d.contractedHours ?? null})
     RETURNING *

@@ -4,7 +4,7 @@ import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 
 export async function GET(req: NextRequest) {
-  const { homeId } = getSessionFromHeaders(req.headers)
+  const { homeId } = await getSessionFromHeaders(req.headers)
   if (!homeId) return authError('UNAUTHORIZED')
 
   try {

@@ -12,7 +12,7 @@ const UpdateSwapSchema = z.object({
 })
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { role, homeId } = getSessionFromHeaders(req.headers)
+  const { role, homeId } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 

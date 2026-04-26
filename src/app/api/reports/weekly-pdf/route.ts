@@ -7,7 +7,7 @@ import { getWeekDays, validateWeekStart } from '@/lib/utils'
 import type { WeekView, WeekViewCell } from '@/types'
 
 export async function GET(req: NextRequest) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)

@@ -11,7 +11,7 @@ const SetAvailabilitySchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 

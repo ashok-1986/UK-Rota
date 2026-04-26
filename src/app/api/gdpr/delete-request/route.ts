@@ -13,7 +13,7 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId, role: _role } = getSessionFromHeaders(req.headers)
+  const { userId, role: _role } = await getSessionFromHeaders(req.headers)
   if (!_role) return authError('UNAUTHORIZED')
 
   const body = await req.json()

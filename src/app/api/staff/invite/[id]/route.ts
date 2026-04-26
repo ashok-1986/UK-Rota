@@ -8,7 +8,7 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const { homeId, role, userId } = getSessionFromHeaders(req.headers)
+    const { homeId, role, userId } = await getSessionFromHeaders(req.headers)
     if (!homeId || !role) return authError('UNAUTHORIZED')
 
     if (role !== 'home_manager' && role !== 'system_admin') {

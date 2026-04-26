@@ -21,7 +21,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params
@@ -60,8 +60,8 @@ export async function PUT(
     RETURNING *
   `
 
-  // TODO Phase 3: if role changed, update Kinde custom claims via Kinde Management API.
-  // For now, admin must update role in Kinde Dashboard manually.
+  // TODO: sync role change to Kinde user_properties via Management API
+  // For now, role is updated in DB only. Admin must update in Kinde Dashboard manually.
 
   await writeAuditLog({
     homeId: target.home_id,

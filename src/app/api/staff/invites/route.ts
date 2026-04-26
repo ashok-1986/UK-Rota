@@ -4,7 +4,7 @@ import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 
 export async function GET(req: NextRequest) {
-    const { homeId, role } = getSessionFromHeaders(req.headers)
+    const { homeId, role } = await getSessionFromHeaders(req.headers)
     if (!homeId || !role) return authError('UNAUTHORIZED')
 
     if (role !== 'home_manager' && role !== 'system_admin') {

@@ -14,7 +14,7 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId, homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   if (!['home_manager', 'system_admin'].includes(role)) {

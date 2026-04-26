@@ -3,7 +3,7 @@ import { getSessionFromHeaders, authError } from '@/lib/auth'
 import sql from '@/lib/db'
 
 export async function POST(req: NextRequest) {
-  const { userId, role } = getSessionFromHeaders(req.headers)
+  const { userId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
   if (role !== 'system_admin') return authError('FORBIDDEN')
 

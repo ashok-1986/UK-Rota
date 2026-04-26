@@ -17,7 +17,7 @@ const Schema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { userId, homeId } = getSessionFromHeaders(req.headers)
+  const { userId, homeId } = await getSessionFromHeaders(req.headers)
   if (!homeId) return NextResponse.json({ error: 'No home context' }, { status: 400 })
 
   const body = await req.json()

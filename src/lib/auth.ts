@@ -1,14 +1,15 @@
-// Central Kinde auth helper for CareRota.
-// Server components and API routes use these — never call getKindeServerSession() directly.
+// =============================================================
+// CareRota — Kinde auth helpers (server-only)
+// Never call getKindeServerSession() directly outside this file.
+// =============================================================
+import 'server-only'
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
+import { redirect } from 'next/navigation'
 import type { AppRole } from '@/types'
 
-export interface AuthSession {
-  userId: string
-  role: AppRole | null
-  homeId: string | null
-  isAuthenticated: boolean
-}
+// ------------------------------------------------------------------
+// Internal: decode access token without network call
+// ------------------------------------------------------------------
 
 interface KindeTokenPayload {
   sub?: string
@@ -21,78 +22,150 @@ function decodeJwtPayload(token: string): KindeTokenPayload | null {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
-    const payload = parts[1]
-    // Add padding if needed
-    const padded = payload + '=='.slice(0, (4 - payload.length % 4) % 4)
-    const decoded = Buffer.from(padded, 'base64').toString('utf-8')
-    return JSON.parse(decoded) as KindeTokenPayload
+    // base64url decode — handle padding
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4)
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'))
   } catch {
     return null
   }
 }
 
-export async function getSession(): Promise<AuthSession> {
+// ------------------------------------------------------------------
+// 1. getKindeAuth()
+// ------------------------------------------------------------------
+// Decodes the Kinde access token manually (no network call).
+// Returns null if not authenticated or properties are missing.
+// user_properties are at payload.user_properties.role.v and
+// payload.user_properties.homeid.v (Kinde forces keys lowercase)
+
+export async function getKindeAuth(): Promise<{
+  kindeUserId: string
+  role: AppRole
+  homeId: string
+} | null> {
   const { getUser, isAuthenticated, getAccessTokenRaw } = getKindeServerSession()
 
   const authenticated = await isAuthenticated()
-  if (!authenticated) {
-    return { userId: '', role: null, homeId: null, isAuthenticated: false }
-  }
+  if (!authenticated) return null
 
   const user = await getUser()
+  if (!user?.id) return null
 
-  // getAccessTokenRaw() reads JWT string from cookie — no network call
-  const rawToken = await getAccessTokenRaw()
+  try {
+    const rawToken = await getAccessTokenRaw()
+    if (!rawToken) return null
 
-  if (!rawToken) {
+    const payload = decodeJwtPayload(rawToken)
+
+    const role = payload?.user_properties?.role?.v as AppRole | undefined
+    const homeId = payload?.user_properties?.homeid?.v as string | undefined
+
+    if (!role || !homeId) return null
+
+    return { kindeUserId: user.id, role, homeId }
+  } catch (err) {
+    console.error('[auth] Token decode failed:', err)
+    return null
+  }
+}
+
+// ------------------------------------------------------------------
+// 2. requireRole()
+// ------------------------------------------------------------------
+// Use in server components. Redirects if not authenticated or wrong role.
+
+export async function requireRole(
+  ...roles: AppRole[]
+): Promise<{ role: AppRole; homeId: string; kindeUserId: string }> {
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/api/auth/kinde/login')
+  if (!roles.includes(auth.role)) redirect('/')
+  return auth
+}
+
+// ------------------------------------------------------------------
+// 3. getSessionContext()
+// ------------------------------------------------------------------
+// Convenience wrapper — redirects if not authenticated.
+
+export async function getSessionContext(): Promise<{ role: AppRole; homeId: string }> {
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/api/auth/kinde/login')
+  return { role: auth.role, homeId: auth.homeId }
+}
+
+// ------------------------------------------------------------------
+// 4. Header helpers (used by API routes reading middleware-injected headers)
+// ------------------------------------------------------------------
+
+export function getHomeIdFromHeaders(headers: Headers): string {
+  const homeId = headers.get('x-home-id')
+  if (!homeId) throw new Error('Missing x-home-id header')
+  return homeId
+}
+
+export function getRoleFromHeaders(headers: Headers): AppRole {
+  const role = headers.get('x-user-role') as AppRole | null
+  if (!role) throw new Error('Missing x-user-role header')
+  return role
+}
+
+// ------------------------------------------------------------------
+// 5. Backward-compatible aliases
+//    Used by 25+ API routes and 14+ page components.
+//    Will be removed in Phase 3 cleanup.
+// ------------------------------------------------------------------
+
+/** @deprecated Use getKindeAuth() instead */
+export interface AuthSession {
+  userId: string
+  role: AppRole | null
+  homeId: string | null
+  isAuthenticated: boolean
+}
+
+/** @deprecated Use getKindeAuth() instead */
+export async function getSession(): Promise<AuthSession> {
+  const auth = await getKindeAuth()
+  if (!auth) {
+    // Try to check if at least authenticated (even without properties)
+    const { isAuthenticated, getUser } = getKindeServerSession()
+    const authed = await isAuthenticated()
+    if (!authed) {
+      return { userId: '', role: null, homeId: null, isAuthenticated: false }
+    }
+    const user = await getUser()
     return { userId: user?.id ?? '', role: null, homeId: null, isAuthenticated: true }
   }
-
-  const payload = decodeJwtPayload(rawToken)
-  const userProps = payload?.user_properties
-
-  const role = (userProps?.role?.v ?? null) as AppRole | null
-  const homeId = userProps?.homeid?.v ?? null
-
   return {
-    userId: user?.id ?? '',
-    role,
-    homeId,
+    userId: auth.kindeUserId,
+    role: auth.role,
+    homeId: auth.homeId,
     isAuthenticated: true,
   }
 }
 
-export async function requireAuth(): Promise<AuthSession> {
-  const session = await getSession()
-  if (!session.isAuthenticated || !session.userId) {
-    throw new Error('UNAUTHORIZED')
-  }
-  return session
-}
-
-export async function requireRole(
-  allowed: AppRole | AppRole[]
-): Promise<AuthSession> {
-  const session = await requireAuth()
-  const allowedRoles = Array.isArray(allowed) ? allowed : [allowed]
-  if (!session.role || !allowedRoles.includes(session.role)) {
-    throw new Error('FORBIDDEN')
-  }
-  return session
-}
-
-export function getSessionFromHeaders(headers: Headers): {
+/** @deprecated Use getKindeAuth() directly instead */
+export async function getSessionFromHeaders(_headers: Headers): Promise<{
   userId: string | null
   homeId: string | null
   role: AppRole | null
-} {
+}> {
+  // Middleware no longer injects x-user-id / x-home-id / x-user-role.
+  // Fall back to decoding the Kinde JWT directly.
+  const auth = await getKindeAuth()
+  if (!auth) {
+    return { userId: null, homeId: null, role: null }
+  }
   return {
-    userId: headers.get('x-user-id'),
-    homeId: headers.get('x-home-id'),
-    role: headers.get('x-user-role') as AppRole | null,
+    userId: auth.kindeUserId,
+    homeId: auth.homeId,
+    role: auth.role,
   }
 }
 
+/** @deprecated Kept for API route compatibility */
 export function authError(type: 'UNAUTHORIZED' | 'FORBIDDEN') {
   const status = type === 'UNAUTHORIZED' ? 401 : 403
   const error = type === 'UNAUTHORIZED' ? 'Unauthorized' : 'Forbidden'

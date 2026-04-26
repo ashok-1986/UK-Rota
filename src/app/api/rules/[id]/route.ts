@@ -14,7 +14,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId, homeId, role } = getSessionFromHeaders(req.headers)
+  const { userId, homeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { id } = await params

@@ -5,7 +5,7 @@ import sql from '@/lib/db'
 import { validateWeekStart, getWeekDays } from '@/lib/utils'
 
 export async function GET(req: NextRequest) {
-  const { homeId: headerHomeId, role } = getSessionFromHeaders(req.headers)
+  const { homeId: headerHomeId, role } = await getSessionFromHeaders(req.headers)
   if (!role) return authError('UNAUTHORIZED')
 
   const { searchParams } = new URL(req.url)

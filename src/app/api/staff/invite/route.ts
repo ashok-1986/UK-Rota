@@ -1,12 +1,11 @@
 // POST /api/staff/invite — send a staff invitation email
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
 import crypto from 'crypto'
 import sql from '@/lib/db'
+import { getKindeAuth } from '@/lib/auth'
 import { sendStaffInvite } from '@/lib/notify'
 import { writeAuditLog, getIp } from '@/lib/audit'
-import type { AppRole } from '@/types'
 
 const InviteSchema = z.object({
     email: z.string().email(),
@@ -15,47 +14,18 @@ const InviteSchema = z.object({
     last_name: z.string().min(1).max(100).optional(),
 })
 
-interface KindeTokenPayload {
-    sub?: string
-    user_properties?: Record<string, { v: string }>
-}
-
-function decodeJwtPayload(token: string): KindeTokenPayload | null {
-    try {
-        const parts = token.split('.')
-        if (parts.length !== 3) return null
-        const payload = parts[1]
-        const padded = payload + '=='.slice(0, (4 - payload.length % 4) % 4)
-        return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'))
-    } catch {
-        return null
-    }
-}
-
 export async function POST(req: NextRequest) {
-    // 1. Auth — decode raw JWT, check role
-    const { getAccessTokenRaw, getUser } = getKindeServerSession()
-    const rawToken = await getAccessTokenRaw()
-
-    if (!rawToken) {
+    // 1. Auth — use centralized getKindeAuth()
+    const auth = await getKindeAuth()
+    if (!auth) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const payload = decodeJwtPayload(rawToken)
-    const userProps = payload?.user_properties
-    const role = userProps?.role?.v as AppRole | undefined
-    const homeId = userProps?.homeid?.v
-
-    if (!role || !homeId) {
-        return NextResponse.json({ error: 'Unauthorized — missing claims' }, { status: 401 })
-    }
-
-    if (role !== 'home_manager' && role !== 'system_admin') {
+    if (!['home_manager', 'system_admin'].includes(auth.role)) {
         return NextResponse.json({ error: 'Forbidden — managers only' }, { status: 403 })
     }
 
-    const user = await getUser()
-    const actorId = user?.id ?? null
+    const homeId = auth.homeId
+    const actorId = auth.kindeUserId
 
     // 2. Parse and validate body
     let body: z.infer<typeof InviteSchema>
