@@ -39,9 +39,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 })
     }
 
-    // 3. Extract event type
-    const eventType = payload.type
-    console.log(`[kinde-webhook] Received event: ${eventType}`)
+    // 3. DEBUG — log full decoded payload to confirm exact Kinde field structure
+    // TODO: Remove this after first successful test
+    console.log('[kinde-webhook] === RAW DECODED PAYLOAD ===')
+    console.log(JSON.stringify(payload, null, 2))
+    console.log('[kinde-webhook] === END PAYLOAD ===')
+
+    // 4. Extract event type
+    const eventType = payload.type ?? (payload as unknown as Record<string, unknown>).event_type as string ?? 'unknown'
+    console.log(`[kinde-webhook] Resolved event type: ${eventType}`)
 
     // 4. Handle user.created
     if (eventType === 'user.created') {
