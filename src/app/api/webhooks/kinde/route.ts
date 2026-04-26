@@ -1,14 +1,19 @@
 // POST /api/webhooks/kinde — handle Kinde webhook events
-// Verify HMAC SHA256 signature, then process user.created events
+// Kinde sends webhooks as JWTs signed with RS256.
+// Verification uses Kinde's public JWKS endpoint.
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
+import { jwtVerify, createRemoteJWKSet } from 'jose'
 import sql from '@/lib/db'
 import { writeAuditLog } from '@/lib/audit'
 
-// Disable body parsing — we need the raw body for HMAC verification
 export const runtime = 'nodejs'
 
-interface KindeUserCreatedPayload {
+// Module-scope: jose caches the JWKS keys automatically
+const JWKS = createRemoteJWKSet(
+    new URL('https://alchemetryx.kinde.com/.well-known/jwks')
+)
+
+interface KindeWebhookPayload {
     type: string
     data: {
         user: {
@@ -20,64 +25,45 @@ interface KindeUserCreatedPayload {
     }
 }
 
-function verifySignature(rawBody: string, signature: string | null): boolean {
-    const secret = process.env.KINDE_WEBHOOK_SECRET
-    if (!secret) {
-        console.error('[kinde-webhook] KINDE_WEBHOOK_SECRET is not set')
-        return false
-    }
-    if (!signature) return false
+export async function POST(request: NextRequest) {
+    // 1. Read raw body — Kinde sends content-type: application/jwt
+    const token = await request.text()
 
-    const expected = crypto
-        .createHmac('sha256', secret)
-        .update(rawBody)
-        .digest('hex')
-
-    return crypto.timingSafeEqual(
-        Buffer.from(expected, 'hex'),
-        Buffer.from(signature, 'hex')
-    )
-}
-
-export async function POST(req: NextRequest) {
-    // 1. Read raw body for signature verification
-    const rawBody = await req.text()
-    const signature = req.headers.get('x-kinde-signature')
-
-    if (!verifySignature(rawBody, signature)) {
-        console.error('[kinde-webhook] Invalid signature')
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    }
-
-    // 2. Parse the event
-    let event: KindeUserCreatedPayload
+    // 2. Verify JWT using Kinde's JWKS
+    let payload: KindeWebhookPayload
     try {
-        event = JSON.parse(rawBody)
-    } catch {
-        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+        const result = await jwtVerify(token, JWKS)
+        payload = result.payload as unknown as KindeWebhookPayload
+    } catch (err) {
+        console.error('[kinde-webhook] JWT verification failed:', err)
+        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 })
     }
 
-    const eventType = event.type
+    // 3. Extract event type
+    const eventType = payload.type
     console.log(`[kinde-webhook] Received event: ${eventType}`)
 
-    // 3. Handle user.created
+    // 4. Handle user.created
     if (eventType === 'user.created') {
-        const { id: kindeUserId, email, first_name, last_name } = event.data.user
-
-        if (!email) {
+        const user = payload.data?.user
+        if (!user?.email) {
             console.warn('[kinde-webhook] user.created event missing email, skipping')
             return NextResponse.json({ received: true })
         }
 
+        const kindeUserId = user.id
+        const email = user.email.toLowerCase()
+        const firstName = user.first_name ?? ''
+        const lastName = user.last_name ?? ''
+
         // Check for a pending invite matching this email
         const invites = await sql`
-      SELECT si.*, h.name AS home_name
-      FROM staff_invites si
-      JOIN homes h ON h.id = si.home_id
-      WHERE si.email = ${email}
-        AND si.status = 'pending'
-        AND si.expires_at > NOW()
-      ORDER BY si.created_at DESC
+      SELECT *
+      FROM staff_invites
+      WHERE LOWER(email) = ${email}
+        AND status = 'pending'
+        AND expires_at > NOW()
+      ORDER BY created_at DESC
       LIMIT 1
     `
 
@@ -96,8 +82,8 @@ export async function POST(req: NextRequest) {
           ${kindeUserId},
           ${homeId},
           ${email},
-          ${first_name ?? ''},
-          ${last_name ?? ''},
+          ${firstName},
+          ${lastName},
           ${role},
           'full_time',
           48,
@@ -107,10 +93,8 @@ export async function POST(req: NextRequest) {
           WHERE deleted_at IS NULL
         DO UPDATE SET
           clerk_user_id = EXCLUDED.clerk_user_id,
-          role = EXCLUDED.role,
-          first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), staff.first_name),
-          last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), staff.last_name),
-          is_active = TRUE,
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
           updated_at = NOW()
         RETURNING id
       `
@@ -128,29 +112,25 @@ export async function POST(req: NextRequest) {
             writeAuditLog({
                 homeId,
                 actorId: kindeUserId,
-                action: 'staff.invite_accepted',
+                action: 'staff.created_via_kinde_webhook',
                 entityType: 'staff_invite',
                 entityId: invite.id as string,
-                metadata: {
-                    staffId,
-                    email,
-                    role,
-                    source: 'kinde_webhook',
-                },
+                metadata: { staffId, email, role },
             })
 
             console.log(
                 `[kinde-webhook] Auto-accepted invite for ${email} → staff ${staffId} at home ${homeId}`
             )
         } else {
-            // No pending invite — log and move on
-            // system_admin users or users who signed up without an invite
             console.log(
-                `[kinde-webhook] user.created: ${email} (${kindeUserId}) — no pending invite, skipping staff creation`
+                `[kinde-webhook] No pending invite for: ${email} (${kindeUserId})`
             )
         }
+
+        return NextResponse.json({ received: true })
     }
 
-    // Always return 200 to acknowledge receipt
-    return NextResponse.json({ received: true })
+    // Unknown event type — acknowledge but don't process
+    console.log(`[kinde-webhook] Unhandled event type: ${eventType}`)
+    return NextResponse.json({ received: true, unhandled: eventType }, { status: 200 })
 }
