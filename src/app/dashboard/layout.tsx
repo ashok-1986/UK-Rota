@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -9,19 +9,19 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  let session
+  let auth
   try {
-    session = await getSession()
+    auth = await getKindeAuth()
   } catch (error) {
-    console.error('[dashboard/layout] getSession failed:', error)
+    console.error('[dashboard/layout] getKindeAuth failed:', error)
     throw error
   }
 
-  if (!session.isAuthenticated || !session.userId) {
+  if (!auth) {
     redirect('/sign-in')
   }
 
-  const { role, homeId } = session
+  const { role, homeId } = auth
 
   if (!role || !homeId) {
     redirect('/account-not-linked?reason=claims-pending')
