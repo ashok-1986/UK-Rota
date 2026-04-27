@@ -6,6 +6,7 @@ import 'server-only'
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server'
 import { redirect } from 'next/navigation'
 import type { AppRole } from '@/types'
+import sql from '@/lib/db'
 
 // ------------------------------------------------------------------
 // Internal: decode access token without network call
@@ -13,36 +14,30 @@ import type { AppRole } from '@/types'
 
 interface KindeTokenPayload {
   sub?: string
-  user_properties?: Record<string, { v: string }>
   org_code?: string
+  org_roles?: { key: string; name?: string }[]
   exp?: number
-}
-
-function decodeJwtPayload(token: string): KindeTokenPayload | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return null
-    // base64url decode — handle padding
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4)
-    return JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'))
-  } catch {
-    return null
-  }
 }
 
 // ------------------------------------------------------------------
 // 1. getKindeAuth()
 // ------------------------------------------------------------------
-// Decodes the Kinde access token manually (no network call).
-// Returns null if not authenticated or properties are missing.
-// user_properties are at payload.user_properties.role.v and
-// payload.user_properties.homeid.v (Kinde forces keys lowercase)
+// Decodes the Kinde access token (no network call except one indexed DB lookup).
+// Reads org_code and org_roles[0].key — standard Kinde org JWT claims.
+
+const ROLE_MAP: Record<string, AppRole> = {
+  'admin': 'home_manager',
+  'manager': 'unit_manager',
+  'member': 'care_staff',
+  'bank': 'bank_staff',
+  'system_admin': 'system_admin',
+}
 
 export async function getKindeAuth(): Promise<{
   kindeUserId: string
   role: AppRole
   homeId: string
+  orgCode: string
 } | null> {
   const { getUser, isAuthenticated, getAccessTokenRaw } = getKindeServerSession()
 
@@ -56,14 +51,40 @@ export async function getKindeAuth(): Promise<{
     const rawToken = await getAccessTokenRaw()
     if (!rawToken) return null
 
-    const payload = decodeJwtPayload(rawToken)
+    const parts = rawToken.split('.')
+    if (parts.length !== 3) return null
 
-    const role = payload?.user_properties?.role?.v as AppRole | undefined
-    const homeId = payload?.user_properties?.homeid?.v as string | undefined
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - base64.length % 4) % 4)
+    const payload = JSON.parse(
+      Buffer.from(padded, 'base64').toString('utf-8')
+    ) as KindeTokenPayload
 
-    if (!role || !homeId) return null
+    // Standard Kinde org claims
+    const orgCode = payload?.org_code
+    const orgRole = payload?.org_roles?.[0]?.key
 
-    return { kindeUserId: user.id, role, homeId }
+    if (!orgCode || !orgRole) {
+      console.warn('[auth] No org_code or org_role in token for user:', user.id)
+      return null
+    }
+
+    const role = ROLE_MAP[orgRole]
+    if (!role) {
+      console.warn('[auth] Unknown org role:', orgRole)
+      return null
+    }
+
+    // Single indexed lookup: org_code → homeId
+    const [home] = await sql`
+      SELECT id FROM homes WHERE kinde_org_code = ${orgCode} LIMIT 1
+    `
+    if (!home) {
+      console.warn('[auth] No home found for org_code:', orgCode)
+      return null
+    }
+
+    return { kindeUserId: user.id, role, homeId: home.id as string, orgCode }
   } catch (err) {
     console.error('[auth] Token decode failed:', err)
     return null
@@ -77,7 +98,7 @@ export async function getKindeAuth(): Promise<{
 
 export async function requireRole(
   ...roles: AppRole[]
-): Promise<{ role: AppRole; homeId: string; kindeUserId: string }> {
+): Promise<{ role: AppRole; homeId: string; kindeUserId: string; orgCode: string }> {
   const auth = await getKindeAuth()
   if (!auth) redirect('/api/auth/kinde/login')
   if (!roles.includes(auth.role)) redirect('/')
