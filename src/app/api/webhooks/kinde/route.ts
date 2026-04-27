@@ -63,6 +63,20 @@ export async function POST(request: NextRequest) {
         const firstName = user.first_name ?? ''
         const lastName = user.last_name ?? ''
 
+        // Check if user is already bootstrapped in staff table
+        const [existingStaff] = await sql`
+          SELECT role FROM staff WHERE LOWER(email) = ${email} LIMIT 1
+        `
+        const role = existingStaff?.role as string | undefined
+
+        // system_admin users are bootstrapped manually — skip invite lookup
+        if (role === 'system_admin') {
+            console.log('[kinde-webhook] system_admin user created, skipping invite flow:', email)
+            // Update their kinde_user_id just in case it was a placeholder
+            await sql`UPDATE staff SET kinde_user_id = ${kindeUserId} WHERE LOWER(email) = ${email}`
+            return NextResponse.json({ message: 'ok' }, { status: 200 })
+        }
+
         // Check for a pending invite matching this email
         const invites = await sql`
       SELECT *

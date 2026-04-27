@@ -102,7 +102,13 @@ export async function requireRole(
   ...roles: AppRole[]
 ): Promise<{ role: AppRole; homeId: string; kindeUserId: string; orgCode: string }> {
   const auth = await getKindeAuth()
-  if (!auth) redirect('/api/auth/kinde/login')
+  if (!auth) {
+    const { isAuthenticated } = getKindeServerSession()
+    if (await isAuthenticated()) {
+      redirect('/account-not-linked')
+    }
+    redirect('/api/auth/kinde/login')
+  }
   if (!roles.includes(auth.role)) redirect('/')
   return auth
 }
@@ -114,7 +120,13 @@ export async function requireRole(
 
 export async function getSessionContext(): Promise<{ role: AppRole; homeId: string }> {
   const auth = await getKindeAuth()
-  if (!auth) redirect('/api/auth/kinde/login')
+  if (!auth) {
+    const { isAuthenticated } = getKindeServerSession()
+    if (await isAuthenticated()) {
+      redirect('/account-not-linked')
+    }
+    redirect('/api/auth/kinde/login')
+  }
   return { role: auth.role, homeId: auth.homeId }
 }
 
