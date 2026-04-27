@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components'
 import { StaffShiftList } from '@/components/shifts/StaffShiftList'
 import type { RotaShiftDetailed } from '@/types'
@@ -7,10 +7,10 @@ import Link from 'next/link'
 import sql from '@/lib/db'
 
 export default async function StaffRotaPage() {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
-  const { userId, role, homeId } = session
+  const { kindeUserId: userId, role, homeId } = auth
 
   // Managers use the dashboard rota view
   if (role === 'home_manager' || role === 'system_admin') {

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import Link from 'next/link'
 
 export default async function SettingsLayout({
@@ -9,11 +9,11 @@ export default async function SettingsLayout({
   children: React.ReactNode
   params: Promise<{ homeId: string }>
 }) {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
   const { homeId: routeHomeId } = await params
-  const { role, homeId: userHomeId } = session
+  const { role, homeId: userHomeId } = auth
 
   if (!['home_manager', 'unit_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')

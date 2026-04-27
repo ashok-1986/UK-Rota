@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { ShiftForm } from '@/components/shifts/ShiftForm'
 import { ShiftsList } from '@/components/shifts/ShiftsList'
 import type { Shift } from '@/types'
@@ -19,11 +19,11 @@ async function getShifts(homeId: string): Promise<Shift[]> {
 }
 
 export default async function ShiftsPage({ params }: PageProps) {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
   const { homeId } = await params
-  const { role } = session
+  const { role } = auth
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')
