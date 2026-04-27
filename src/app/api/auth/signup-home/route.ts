@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const managerKindeId = kindeUserId ?? userId ?? null
 
     const [staff] = await sql`
-      INSERT INTO staff (clerk_user_id, home_id, first_name, last_name, email, role, is_active)
+      INSERT INTO staff (kinde_user_id, home_id, first_name, last_name, email, role, is_active)
       VALUES (${managerKindeId}, ${home.id}, ${managerFirstName ?? 'Manager'}, ${managerLastName ?? 'User'}, ${managerEmail}, 'home_manager', TRUE)
       RETURNING id
     `

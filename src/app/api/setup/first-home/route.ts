@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     // firstName/lastName/email can be passed in body; caller should provide these
     // since we no longer call Kinde Management API to fetch user details here.
     const [staff] = await sql`
-      INSERT INTO staff (clerk_user_id, home_id, first_name, last_name, email, role, is_active)
+      INSERT INTO staff (kinde_user_id, home_id, first_name, last_name, email, role, is_active)
       VALUES (${userId ?? null}, ${home.id}, ${firstName ?? 'Manager'}, ${lastName ?? ''}, ${email ?? 'admin@carehome.co.uk'}, 'home_manager', TRUE)
       RETURNING id
     `

@@ -76,13 +76,13 @@ export default async function InviteCompletePage({ params }: PageProps) {
     }
 
     // 5. Create or update staff record
-    // Uses clerk_user_id column for the Kinde user ID — Phase 3 will rename the column
+    // Uses kinde_user_id column for the Kinde user ID — Phase 3 will rename the column
     const homeId = invite.home_id as string
     const role = invite.role as string
 
     const staffRows = await sql`
     INSERT INTO staff (
-      clerk_user_id, home_id, email, first_name, last_name, role,
+      kinde_user_id, home_id, email, first_name, last_name, role,
       employment_type, max_hours_week, is_active
     ) VALUES (
       ${kindeUserId},
@@ -98,7 +98,7 @@ export default async function InviteCompletePage({ params }: PageProps) {
     ON CONFLICT (email, home_id)
       WHERE deleted_at IS NULL
     DO UPDATE SET
-      clerk_user_id = EXCLUDED.clerk_user_id,
+      kinde_user_id = EXCLUDED.kinde_user_id,
       role = EXCLUDED.role,
       first_name = COALESCE(NULLIF(EXCLUDED.first_name, ''), staff.first_name),
       last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), staff.last_name),

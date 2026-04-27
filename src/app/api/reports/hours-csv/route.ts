@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const rows = await sql`
     SELECT
-      st.id, st.home_id, st.unit_id, st.clerk_user_id, st.first_name, st.last_name,
+      st.id, st.home_id, st.unit_id, st.kinde_user_id, st.first_name, st.last_name,
       st.email, st.phone, st.role, st.employment_type, st.contracted_hours,
       st.is_active, st.deleted_at, st.created_at, st.updated_at,
       rs.id AS rota_shift_id, rs.shift_date, rs.week_start, rs.status,
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     if (!staffMap.has(staffId)) {
       const staff: Staff = {
         id: row.id, home_id: row.home_id, unit_id: row.unit_id,
-        clerk_user_id: row.clerk_user_id, first_name: row.first_name, last_name: row.last_name,
+        kinde_user_id: row.kinde_user_id, first_name: row.first_name, last_name: row.last_name,
         email: row.email, phone: row.phone, role: row.role, employment_type: row.employment_type,
         contracted_hours: row.contracted_hours ? Number(row.contracted_hours) : null,
         max_hours_week: row.max_hours_week ?? 48,

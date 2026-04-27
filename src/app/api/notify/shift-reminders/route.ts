@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   for (const row of rows) {
     const staff: Staff = {
       id: row.id, home_id: row.home_id, unit_id: row.unit_id,
-      clerk_user_id: row.clerk_user_id, first_name: row.first_name, last_name: row.last_name,
+      kinde_user_id: row.kinde_user_id, first_name: row.first_name, last_name: row.last_name,
       email: row.email, phone: row.phone, role: row.role, employment_type: row.employment_type,
       contracted_hours: row.contracted_hours ? Number(row.contracted_hours) : null,
       max_hours_week: row.max_hours_week ?? 48,

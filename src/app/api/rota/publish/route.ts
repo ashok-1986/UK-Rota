@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   const publishedCount = result.length
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId,

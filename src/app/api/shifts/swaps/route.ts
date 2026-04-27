@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         ORDER BY ss.created_at DESC
       `
     } else {
-      // Staff only see their own swaps — match via clerk_user_id
+      // Staff only see their own swaps — match via kinde_user_id
       swaps = await sql`
         SELECT
           ss.id, ss.status, ss.reason, ss.response_note,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         LEFT JOIN staff s2 ON s2.id = ss.target_id
         LEFT JOIN rota_shifts rs2 ON rs2.id = ss.target_shift_id
         LEFT JOIN shifts sh2 ON sh2.id = rs2.shift_id
-        WHERE s1.clerk_user_id = ${userId}
+        WHERE s1.kinde_user_id = ${userId}
           ${status ? sql`AND ss.status = ${status}` : sql``}
         ORDER BY ss.created_at DESC
       `
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
   try {
     const [requester] = await sql`
       SELECT id, first_name, last_name FROM staff
-      WHERE clerk_user_id = ${userId} AND home_id = ${homeId} AND is_active = TRUE
+      WHERE kinde_user_id = ${userId} AND home_id = ${homeId} AND is_active = TRUE
       LIMIT 1
     `
     if (!requester) {

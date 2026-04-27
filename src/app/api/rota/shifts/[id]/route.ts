@@ -30,7 +30,7 @@ export async function PUT(
   // Staff can only confirm/cancel their own shifts
   if (role === 'care_staff' || role === 'bank_staff') {
     const [staffRecord] = await sql`
-      SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1
+      SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1
     `
     if (rotaShift.staff_id !== staffRecord?.id) {
       return NextResponse.json({ error: 'Forbidden — you can only update your own shifts' }, { status: 403 })
@@ -57,7 +57,7 @@ export async function PUT(
     RETURNING *
   `
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: rotaShift.home_id,

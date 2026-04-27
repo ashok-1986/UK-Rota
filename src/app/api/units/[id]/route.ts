@@ -63,7 +63,7 @@ export async function PUT(
 
   if (!unit) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: headerHomeId!,
@@ -104,7 +104,7 @@ export async function DELETE(
 
   if (!unit) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: headerHomeId!,

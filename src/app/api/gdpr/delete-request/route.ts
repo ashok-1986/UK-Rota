@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Get requester
   const [requester] = await sql`
-    SELECT * FROM staff WHERE clerk_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
+    SELECT * FROM staff WHERE kinde_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
   `
   if (!requester) return NextResponse.json({ error: 'Requester not found' }, { status: 403 })
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   `
 
   // TODO Phase 3: disable Kinde account via Kinde Management API
-  // await kindeManagementClient.deleteUser(target.clerk_user_id)
+  // await kindeManagementClient.deleteUser(target.kinde_user_id)
 
   await writeAuditLog({
     homeId: target.home_id,

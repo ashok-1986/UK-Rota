@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
           : null,
         staff: rs?.staff_id
           ? {
-              id: rs.staff_id as string, home_id: homeId, unit_id: null, clerk_user_id: '',
+              id: rs.staff_id as string, home_id: homeId, unit_id: null, kinde_user_id: '',
               first_name: rs.staff_first_name as string, last_name: rs.staff_last_name as string,
               email: rs.staff_email as string, phone: rs.staff_phone as string | null,
               role: rs.staff_role as 'care_staff', employment_type: 'full_time',

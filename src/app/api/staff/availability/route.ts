@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
 
   // Staff can only view their own availability
   if (role === 'care_staff' || role === 'bank_staff') {
-    const [staff] = await sql`SELECT clerk_user_id FROM staff WHERE id = ${staffId} AND home_id = ${homeId} LIMIT 1`
-    if (!staff || staff.clerk_user_id !== userId) {
+    const [staff] = await sql`SELECT kinde_user_id FROM staff WHERE id = ${staffId} AND home_id = ${homeId} LIMIT 1`
+    if (!staff || staff.kinde_user_id !== userId) {
       return authError('FORBIDDEN')
     }
   }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   const { staffId, unavailableDates } = parsed.data
 
   const [staff] = await sql`
-    SELECT id, clerk_user_id FROM staff
+    SELECT id, kinde_user_id FROM staff
     WHERE id = ${staffId} AND home_id = ${homeId} AND is_active = TRUE AND deleted_at IS NULL
     LIMIT 1
   `
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
   }
 
-  if ((role === 'care_staff' || role === 'bank_staff') && staff.clerk_user_id !== userId) {
+  if ((role === 'care_staff' || role === 'bank_staff') && staff.kinde_user_id !== userId) {
     return authError('FORBIDDEN')
   }
 

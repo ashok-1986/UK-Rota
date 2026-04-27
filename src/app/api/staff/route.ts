@@ -71,14 +71,14 @@ export async function POST(req: NextRequest) {
     return authError('FORBIDDEN')
   }
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   // Placeholder until Kinde webhook fires and updates with the real Kinde user ID
   const pendingKindeId = `pending_kinde_${crypto.randomUUID()}`
 
   const [staffRow] = await sql`
     INSERT INTO staff
-      (home_id, unit_id, clerk_user_id, first_name, last_name, email, phone,
+      (home_id, unit_id, kinde_user_id, first_name, last_name, email, phone,
        role, employment_type, contracted_hours)
     VALUES
       (${d.homeId}, ${d.unitId ?? null}, ${pendingKindeId},

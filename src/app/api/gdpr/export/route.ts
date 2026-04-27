@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   // Get the requesting user's staff record
   const [requester] = await sql`
-    SELECT * FROM staff WHERE clerk_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
+    SELECT * FROM staff WHERE kinde_user_id = ${userId ?? ''} AND deleted_at IS NULL LIMIT 1
   `
   if (!requester) return NextResponse.json({ error: 'Requester staff record not found' }, { status: 403 })
 

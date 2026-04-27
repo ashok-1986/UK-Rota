@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Swap request not found' }, { status: 404 })
     }
 
-    const [reviewer] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId ?? ''} AND home_id = ${homeId} LIMIT 1`
+    const [reviewer] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId ?? ''} AND home_id = ${homeId} LIMIT 1`
 
     if (status === 'approved') {
       if (swap.target_shift_id) {

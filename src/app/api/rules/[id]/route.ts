@@ -42,7 +42,7 @@ export async function PUT(
     RETURNING *
   `
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: rule.home_id,

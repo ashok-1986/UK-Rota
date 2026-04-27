@@ -15,7 +15,7 @@ export async function GET(
   // Staff can only view their own shifts
   if (role === 'care_staff' || role === 'bank_staff') {
     const [staffRecord] = await sql`
-      SELECT id FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
+      SELECT id FROM staff WHERE kinde_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
     `
     if (staffRecord?.id !== id) {
       return authError('FORBIDDEN')

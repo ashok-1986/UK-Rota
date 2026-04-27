@@ -40,7 +40,7 @@ export interface Unit {
 
 export interface Staff {
   id: string;
-  clerk_user_id: string;
+  kinde_user_id: string;
   home_id: string;
   unit_id: string | null;
   first_name: string;
@@ -60,7 +60,7 @@ export interface Staff {
 
 export interface StaffMinimal {
   id: string;
-  clerk_user_id: string;
+  kinde_user_id: string;
   home_id: string;
   unit_id: string | null;
   first_name: string;

@@ -76,7 +76,7 @@ export async function PUT(
 
   if (!home) return NextResponse.json({ error: 'Home not found' }, { status: 404 })
 
-  const [actor] = await sql`SELECT id FROM staff WHERE clerk_user_id = ${userId} LIMIT 1`
+  const [actor] = await sql`SELECT id FROM staff WHERE kinde_user_id = ${userId} LIMIT 1`
 
   await writeAuditLog({
     homeId: id,

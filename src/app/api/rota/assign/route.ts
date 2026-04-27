@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const weekStart = getWeekStart(shiftDate)
 
   const [actor] = await sql`
-    SELECT id FROM staff WHERE clerk_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
+    SELECT id FROM staff WHERE kinde_user_id = ${userId} AND deleted_at IS NULL LIMIT 1
   `
   if (!actor) return NextResponse.json({ error: 'Actor staff record not found' }, { status: 404 })
 

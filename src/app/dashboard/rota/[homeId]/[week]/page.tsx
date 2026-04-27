@@ -92,7 +92,7 @@ async function getRotaData(homeId: string, week: string): Promise<WeekView | nul
             id: assignment.staff_id as string,
             home_id: homeId,
             unit_id: null,
-            clerk_user_id: '',
+            kinde_user_id: '',
             first_name: assignment.staff_first_name as string,
             last_name: assignment.staff_last_name as string,
             email: assignment.staff_email as string,
