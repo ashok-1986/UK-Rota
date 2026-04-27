@@ -20,7 +20,7 @@ CREATE TABLE homes (
   timezone      TEXT        NOT NULL DEFAULT 'Europe/London',
   max_staff     INT         NOT NULL DEFAULT 0,
   is_active     BOOLEAN     NOT NULL DEFAULT TRUE,
-  clerk_org_id  VARCHAR(255),  -- Clerk organization ID for SSO/permissions
+  kinde_org_code VARCHAR(255) UNIQUE,  -- Kinde organization code for RBAC
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -45,7 +45,7 @@ CREATE TABLE units (
 -- =============================================================
 CREATE TABLE staff (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  clerk_user_id       VARCHAR(255) NOT NULL,  -- Clerk user ID
+  kinde_user_id       VARCHAR(255) NOT NULL,  -- Kinde user ID
   home_id             UUID NOT NULL REFERENCES homes(id) ON DELETE CASCADE,
   unit_id             UUID REFERENCES units(id) ON DELETE SET NULL,
   first_name          VARCHAR(100) NOT NULL,
@@ -152,7 +152,7 @@ CREATE INDEX idx_units_home_id ON units(home_id);
 
 -- Staff
 CREATE INDEX idx_staff_home_id ON staff(home_id);
-CREATE INDEX idx_staff_clerk_user_id ON staff(clerk_user_id);
+CREATE INDEX idx_staff_kinde_user_id ON staff(kinde_user_id);
 CREATE INDEX idx_staff_email ON staff(email);
 CREATE INDEX idx_staff_active_home ON staff(home_id) WHERE is_active = TRUE AND deleted_at IS NULL;
 
