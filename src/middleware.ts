@@ -12,12 +12,14 @@ const PUBLIC_PATHS = [
   '/privacy',
   '/account-not-linked',
   '/invite',
+  '/register',
 ]
 
 const PUBLIC_PREFIXES = [
   '/api/auth/kinde',      // Kinde callback and login/logout routes
-  '/api/webhooks/',       // Clerk and Kinde webhook handlers
+  '/api/webhooks/',       // Kinde webhook handlers
   '/api/setup/',          // First-home setup
+  '/api/onboarding/',     // Home registration (guarded by ONBOARDING_SECRET)
   '/invite/',             // Invite accept pages
   '/_next/',
   '/favicon',
