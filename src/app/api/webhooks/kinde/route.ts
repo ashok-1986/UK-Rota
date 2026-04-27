@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 import sql from '@/lib/db'
+import { addUserToOrg } from '@/lib/kinde-mgmt'
 import { writeAuditLog } from '@/lib/audit'
 
 export const runtime = 'nodejs'
@@ -79,10 +80,9 @@ export async function POST(request: NextRequest) {
             const role = invite.role as string
 
             // Create or update staff record
-            // Uses clerk_user_id column for Kinde user ID — Phase 3 will rename
             const staffRows = await sql`
         INSERT INTO staff (
-          clerk_user_id, home_id, email, first_name, last_name, role,
+          kinde_user_id, home_id, email, first_name, last_name, role,
           employment_type, max_hours_week, is_active
         ) VALUES (
           ${kindeUserId},
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         ON CONFLICT (email, home_id)
           WHERE deleted_at IS NULL
         DO UPDATE SET
-          clerk_user_id = EXCLUDED.clerk_user_id,
+          kinde_user_id = EXCLUDED.kinde_user_id,
           first_name = EXCLUDED.first_name,
           last_name = EXCLUDED.last_name,
           updated_at = NOW()
@@ -106,6 +106,28 @@ export async function POST(request: NextRequest) {
       `
 
             const staffId = staffRows[0]?.id as string
+
+            // Add user to their Kinde org
+            const kindeRoleMap: Record<string, 'admin' | 'member'> = {
+                home_manager: 'admin',
+                unit_manager: 'member',
+                care_staff: 'member',
+                bank_staff: 'member',
+            }
+            const [home] = await sql`
+              SELECT kinde_org_code FROM homes WHERE id = ${homeId} LIMIT 1
+            `
+            if (home?.kinde_org_code) {
+                try {
+                    await addUserToOrg(
+                        kindeUserId,
+                        home.kinde_org_code as string,
+                        kindeRoleMap[role] ?? 'member'
+                    )
+                } catch (err) {
+                    console.error('[kinde-webhook] addUserToOrg failed (non-fatal):', err)
+                }
+            }
 
             // Mark invite as accepted
             await sql`
