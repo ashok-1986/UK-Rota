@@ -21,17 +21,6 @@ interface KindeTokenPayload {
 
 // ------------------------------------------------------------------
 // 1. getKindeAuth()
-// ------------------------------------------------------------------
-// Decodes the Kinde access token (no network call except one indexed DB lookup).
-// Reads org_code and org_roles[0].key — standard Kinde org JWT claims.
-
-const ROLE_MAP: Record<string, AppRole> = {
-  'admin': 'home_manager',
-  'manager': 'unit_manager',
-  'member': 'care_staff',
-  'bank': 'bank_staff',
-  'system_admin': 'system_admin',
-}
 
 export async function getKindeAuth(): Promise<{
   kindeUserId: string
@@ -62,20 +51,20 @@ export async function getKindeAuth(): Promise<{
 
     // Standard Kinde org claims
     const orgCode = payload?.org_code
-    const orgRole = payload?.org_roles?.[0]?.key
+    const orgRole = payload?.org_roles?.[0]?.key  // 'admin' | 'member' — sanity check only
 
-    if (!orgCode || !orgRole) {
-      console.warn('[auth] No org_code or org_role in token for user:', user.id)
+    if (!orgCode) {
+      console.warn('[auth] No org_code in token for user:', user.id)
       return null
     }
 
-    const role = ROLE_MAP[orgRole]
-    if (!role) {
-      console.warn('[auth] Unknown org role:', orgRole)
+    // Sanity: token must be org-scoped
+    if (orgRole !== 'admin' && orgRole !== 'member') {
+      console.warn('[auth] Unexpected org_role in token:', orgRole, 'for user:', user.id)
       return null
     }
 
-    // Single indexed lookup: org_code → homeId
+    // Resolve home + exact AppRole from DB (staff record is source of truth)
     const [home] = await sql`
       SELECT id FROM homes WHERE kinde_org_code = ${orgCode} LIMIT 1
     `
@@ -83,8 +72,21 @@ export async function getKindeAuth(): Promise<{
       console.warn('[auth] No home found for org_code:', orgCode)
       return null
     }
+    const homeId = home.id as string
 
-    return { kindeUserId: user.id, role, homeId: home.id as string, orgCode }
+    const [staffRow] = await sql`
+      SELECT role FROM staff
+      WHERE kinde_user_id = ${user.id}
+        AND home_id = ${homeId}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `
+    if (!staffRow) {
+      console.warn('[auth] No staff record for user:', user.id, 'home:', homeId)
+      return null
+    }
+
+    return { kindeUserId: user.id, role: staffRow.role as AppRole, homeId, orgCode }
   } catch (err) {
     console.error('[auth] Token decode failed:', err)
     return null

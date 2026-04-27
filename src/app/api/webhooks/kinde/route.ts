@@ -107,12 +107,13 @@ export async function POST(request: NextRequest) {
 
             const staffId = staffRows[0]?.id as string
 
-            // Add user to their Kinde org
+            // Map AppRole to Kinde org role (Kinde has 2 roles: admin / member)
             const kindeRoleMap: Record<string, 'admin' | 'member'> = {
                 home_manager: 'admin',
-                unit_manager: 'member',
+                unit_manager: 'admin',
                 care_staff: 'member',
                 bank_staff: 'member',
+                system_admin: 'admin',
             }
             const [home] = await sql`
               SELECT kinde_org_code FROM homes WHERE id = ${homeId} LIMIT 1
