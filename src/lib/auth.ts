@@ -182,13 +182,21 @@ export async function getSession(): Promise<AuthSession> {
 }
 
 /** @deprecated Use getKindeAuth() directly instead */
-export async function getSessionFromHeaders(_headers: Headers): Promise<{
+export async function getSessionFromHeaders(headers: Headers): Promise<{
   userId: string | null
   homeId: string | null
   role: AppRole | null
 }> {
-  // Middleware no longer injects x-user-id / x-home-id / x-user-role.
-  // Fall back to decoding the Kinde JWT directly.
+  // Middleware now injects these headers properly again!
+  const homeId = headers.get('x-home-id')
+  const role = headers.get('x-user-role') as AppRole | null
+  const userId = headers.get('x-user-id')
+
+  if (homeId && role) {
+    return { userId, homeId, role }
+  }
+
+  // Fall back to decoding the Kinde JWT directly if not present (e.g. bypass)
   const auth = await getKindeAuth()
   if (!auth) {
     return { userId: null, homeId: null, role: null }

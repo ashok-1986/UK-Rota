@@ -5,6 +5,7 @@
 // =============================================================
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { decodeJwt, jwtVerify, createRemoteJWKSet } from 'jose'
 
 // Public routes — no auth required
 const PUBLIC_PATHS = [
@@ -30,7 +31,7 @@ const CRON_PREFIXES = [
   '/api/admin/',
 ]
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Static files and Next internals
@@ -53,10 +54,28 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Check Kinde session cookie exists
   // Kinde sets cookies whose names vary by SDK version.
-  // Check for any cookie starting with 'kinde' or named 'id_token'.
-  const kindeSessionExists = request.cookies.getAll().some(
+  // We'll look for access_token or id_token to decode role and homeId
+  const allCookies = request.cookies.getAll()
+  let tokenStr: string | undefined
+
+  for (const c of allCookies) {
+    if (c.name.includes('access_token')) {
+      tokenStr = c.value
+      break
+    }
+  }
+
+  if (!tokenStr) {
+    for (const c of allCookies) {
+      if (c.name.includes('id_token')) {
+        tokenStr = c.value
+        break
+      }
+    }
+  }
+
+  const kindeSessionExists = allCookies.some(
     c => c.name.startsWith('kinde') || c.name === 'id_token'
   )
 
@@ -71,13 +90,73 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // NOTE: We do NOT inject x-home-id or x-user-role headers here.
-  // Middleware runs on Edge and cannot decode the Kinde JWT.
-  // Each page calls getKindeAuth() from src/lib/auth.ts.
-  // API routes call getSessionFromHeaders() which falls back to
-  // getKindeAuth() when headers are not present.
+  let role: string | null = null
+  let homeId: string | null = null
+  let userId: string | null = null
 
-  return NextResponse.next()
+  if (tokenStr) {
+    try {
+      // Secure validation of JWT signature using Kinde's JWKS
+      const issuerUrl = process.env.KINDE_ISSUER_URL
+      if (!issuerUrl) {
+        console.error('[middleware] Missing KINDE_ISSUER_URL env var')
+      } else {
+        const jwksUrl = new URL('/.well-known/jwks.json', issuerUrl)
+        const JWKS = createRemoteJWKSet(jwksUrl)
+        const { payload } = await jwtVerify(tokenStr, JWKS, {
+          issuer: issuerUrl,
+        })
+
+        userId = payload.sub || null
+        // user_properties is stored as lower case keys in Kinde
+        const userProps = payload.user_properties as Record<string, { v: string }> | undefined
+        if (userProps) {
+          role = userProps.role?.v || null
+          homeId = userProps.homeid?.v || null
+        }
+      }
+    } catch (e) {
+      console.error('[middleware] Failed to verify JWT:', e)
+    }
+  }
+
+  const isRSC = request.headers.get('RSC') === '1' || request.nextUrl.searchParams.has('_rsc')
+  const isManagerRoute = pathname.match(/^\/homes\/.*\/settings/) ||
+                         pathname.match(/^\/api\/(staff|shifts|units|rules|rota\/assign|rota\/publish|reports|homes)/)
+  const isAdminRoute = pathname.match(/^\/api\/auth\/signup-home/)
+
+  // If this is a normal request and we're navigating to a manager or admin route, check roles
+  if (!isRSC) {
+    if (isAdminRoute && role !== 'system_admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (isManagerRoute && !['system_admin', 'home_manager', 'unit_manager'].includes(role || '')) {
+      // 403 or redirect
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      } else {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
+    }
+  }
+
+  const requestHeaders = new Headers(request.headers)
+
+  // Security fix: Strip any existing spoofed headers
+  requestHeaders.delete('x-user-role')
+  requestHeaders.delete('x-home-id')
+  requestHeaders.delete('x-user-id')
+
+  if (role) requestHeaders.set('x-user-role', role)
+  if (homeId) requestHeaders.set('x-home-id', homeId)
+  if (userId) requestHeaders.set('x-user-id', userId)
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  })
 }
 
 export const config = {

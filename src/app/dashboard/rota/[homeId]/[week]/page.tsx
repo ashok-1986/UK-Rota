@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { RotaCalendar } from '@/components/rota/RotaCalendar'
 import sql from '@/lib/db'
 import { getWeekDays, validateWeekStart } from '@/lib/utils'
@@ -130,11 +130,11 @@ async function getStaffDirect(homeId: string): Promise<Staff[]> {
 }
 
 export default async function DashboardRotaPage({ params }: PageProps) {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
   const { homeId, week } = await params
-  const { role, homeId: userHomeId } = session
+  const { role, homeId: userHomeId } = auth
 
   if (role !== 'system_admin' && homeId !== userHomeId) {
     redirect('/sign-in')

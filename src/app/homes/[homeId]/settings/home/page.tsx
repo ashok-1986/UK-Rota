@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { HomeSettingsForm } from '@/components/home/HomeSettingsForm'
 import type { Home } from '@/types'
 
@@ -18,11 +18,11 @@ async function getHome(homeId: string): Promise<Home | null> {
 }
 
 export default async function HomeSettingsPage({ params }: PageProps) {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
   const { homeId } = await params
-  const { role } = session
+  const { role } = auth
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')

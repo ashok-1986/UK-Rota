@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/auth'
+import { getKindeAuth } from '@/lib/auth'
 import { StaffTable } from '@/components/staff/StaffTable'
 import { PendingInvites } from '@/components/staff/PendingInvites'
 import { StaffActions } from './StaffActions'
@@ -20,10 +20,10 @@ async function getStaff(homeId: string): Promise<Staff[]> {
 }
 
 export default async function StaffPage() {
-  const session = await getSession()
-  if (!session.isAuthenticated) redirect('/sign-in')
+  const auth = await getKindeAuth()
+  if (!auth) redirect('/sign-in')
 
-  const { role, homeId } = session
+  const { role, homeId } = auth
 
   if (!['home_manager', 'system_admin'].includes(role ?? '')) {
     redirect('/dashboard')
